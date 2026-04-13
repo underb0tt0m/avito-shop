@@ -2,8 +2,9 @@ package service
 
 import (
 	"avito-shop/internal/features/api/transport/dto"
+	"context"
 )
 
 type Service interface {
-	GetUserInfo(username string) (*dto.InfoResponse, error)
+	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
 }
