@@ -25,9 +25,9 @@ func CreateToken(data any) (string, error) {
 		return "", err
 	}
 
-	mapClaims["ExpiresAt"] = jwt.NewNumericDate(time.Now().Add(24 * time.Hour))
-	mapClaims["IssuedAt"] = jwt.NewNumericDate(time.Now())
-	mapClaims["Issuer"] = "app"
+	mapClaims["exp"] = jwt.NewNumericDate(time.Now().Add(24 * time.Hour))
+	mapClaims["iat"] = jwt.NewNumericDate(time.Now())
+	mapClaims["iss"] = "app"
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mapClaims)
 	tokenString, err := token.SignedString(secretKey)

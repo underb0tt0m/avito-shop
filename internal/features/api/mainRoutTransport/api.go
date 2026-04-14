@@ -1,6 +1,7 @@
 package mainRoutTransport
 
 import (
+	"avito-shop/internal/core/middleware"
 	"avito-shop/internal/features/api/mainRoutService"
 	"context"
 	"encoding/json"
@@ -23,19 +24,36 @@ func Register(s mainRoutService.Service, r chi.Router, logger *zap.Logger) {
 			zap.String("remoteAddr", r.RemoteAddr),
 		)
 
-		token := r.Header.Get("Authorization")
-		if token == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			logger.Warn(
-				"missing authorization token",
-				zap.String("path", r.URL.Path),
-				zap.String("remote_addr", r.RemoteAddr),
-			)
-			return
+		claims, err := middleware.Auth(w, r)
+		if err != nil {
+			switch err.Error() {
+			case "unauthorized":
+				logger.Warn("user is unauthorized")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			case "token expired":
+				logger.Info(
+					"user's token has expired",
+					zap.String("username", claims.UserName),
+				)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			case "token is malformed: token contains an invalid number of segment":
+				logger.Debug("bad request")
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			default:
+				logger.Info(
+					"failed to validate user's token",
+					zap.Error(err),
+				)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 		}
-		logger.Debug("JWT token received")
-		//username := ParseJWT(token) TODO после добавления авторизации
-		username := "Artem"
+
+		logger.Debug("JWT token is valid")
+		username := claims.UserName
 
 		ctx, cancel := context.WithTimeout(r.Context(), queryTimeout)
 		defer cancel()
