@@ -1,4 +1,4 @@
-package models
+package mainRootModels
 
 type User struct {
 	Id      int

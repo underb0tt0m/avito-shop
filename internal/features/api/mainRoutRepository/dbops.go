@@ -1,7 +1,7 @@
-package repository
+package mainRoutRepository
 
 import (
-	"avito-shop/internal/features/api/repository/views"
+	"avito-shop/internal/features/api/mainRoutRepository/mainRootViews"
 	"context"
 
 	"github.com/jackc/pgx/v5"
@@ -13,7 +13,7 @@ type StorageImpl struct {
 	Logger *zap.Logger
 }
 
-func (s StorageImpl) GetUserInfo(ctx context.Context, username string) ([]views.UserInventory, []views.UserTransaction, error) {
+func (s StorageImpl) GetUserInfo(ctx context.Context, username string) ([]mainRootViews.UserInventory, []mainRootViews.UserTransaction, error) {
 	userInfoStmt := `
 SELECT
 	a.balance,
@@ -37,7 +37,7 @@ WHERE a.name=$1
 	var (
 		balance, quantity *int
 		itemName          *string
-		userInventories   []views.UserInventory
+		userInventories   []mainRootViews.UserInventory
 	)
 	defer rows.Close()
 	for rows.Next() {
@@ -54,13 +54,13 @@ WHERE a.name=$1
 			return nil, nil, err
 		}
 		if itemName != nil {
-			userInventories = append(userInventories, views.UserInventory{
+			userInventories = append(userInventories, mainRootViews.UserInventory{
 				Balance:  *balance,
 				ItemName: *itemName,
 				Quantity: *quantity,
 			})
 		} else {
-			userInventories = append(userInventories, views.UserInventory{
+			userInventories = append(userInventories, mainRootViews.UserInventory{
 				Balance: *balance,
 			})
 		}
@@ -83,7 +83,7 @@ WHERE b.name=$1 OR c.name=$1
 		fromUser         string
 		toUser           string
 		amount           int
-		userTransactions []views.UserTransaction
+		userTransactions []mainRootViews.UserTransaction
 	)
 
 	if err != nil {
@@ -108,7 +108,7 @@ WHERE b.name=$1 OR c.name=$1
 			)
 			return nil, nil, err
 		}
-		userTransactions = append(userTransactions, views.UserTransaction{
+		userTransactions = append(userTransactions, mainRootViews.UserTransaction{
 			FromUser: fromUser,
 			ToUser:   toUser,
 			Amount:   amount,

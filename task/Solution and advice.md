@@ -113,12 +113,12 @@ func (h *Handler) SendCoin(w http.ResponseWriter, r *http.Request) {
 ```bash
 /internal/repo/merch/
   merch.go                // Реализация репозитория merch.
-/internal/service/merch/
+/internal/mainRoutService/merch/
   merch.go                // Реализация сервиса merch.
 ```
 
 ```go
-// /internal/service/merch/merch.go
+// /internal/mainRoutService/merch/merch.go
 package merch
 
 type MerchRepo interface {

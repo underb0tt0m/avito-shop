@@ -1,30 +1,30 @@
-package service
+package mainRoutService
 
 import (
 	"avito-shop/internal/core/domains"
-	"avito-shop/internal/features/api/repository"
-	"avito-shop/internal/features/api/transport/dto"
+	"avito-shop/internal/features/api/mainRoutRepository"
+	"avito-shop/internal/features/api/mainRoutTransport/mainRoutDTO"
 	"context"
 
 	"go.uber.org/zap"
 )
 
 type ServiceImpl struct {
-	Repo   repository.Storage
+	Repo   mainRoutRepository.Storage
 	Logger *zap.Logger
 }
 
-func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error) {
+func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*mainRoutDTO.InfoResponse, error) {
 	userInventories, userTransactions, err := s.Repo.GetUserInfo(ctx, username)
 	if err != nil {
 		s.Logger.Error(
-			"failed to get user info from repository",
+			"failed to get user info from mainRoutRepository",
 			zap.Error(err),
 			zap.String("username", username),
 		)
 		return nil, err
 	}
-	s.Logger.Debug("received data from repository",
+	s.Logger.Debug("received data from mainRoutRepository",
 		zap.Int("inventory_count", len(userInventories)),
 		zap.Int("transactions_count", len(userTransactions)),
 		zap.String("username", username),
@@ -81,32 +81,32 @@ func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*dto.Inf
 		},
 	}
 
-	dtoInventory := make([]dto.Item, len(userDomain.Inventory))
+	dtoInventory := make([]mainRoutDTO.Item, len(userDomain.Inventory))
 	for idx := range userDomain.Inventory {
-		dtoInventory[idx] = dto.Item{
+		dtoInventory[idx] = mainRoutDTO.Item{
 			ObjType:  userDomain.Inventory[idx].ObjType,
 			Quantity: userDomain.Inventory[idx].Quantity,
 		}
 	}
-	dtoReceived := make([]dto.ReceivedTransaction, len(userDomain.CoinHistory.Received))
+	dtoReceived := make([]mainRoutDTO.ReceivedTransaction, len(userDomain.CoinHistory.Received))
 	for idx := range userDomain.CoinHistory.Received {
-		dtoReceived[idx] = dto.ReceivedTransaction{
+		dtoReceived[idx] = mainRoutDTO.ReceivedTransaction{
 			FromUser: userDomain.CoinHistory.Received[idx].FromUser,
 			Amount:   userDomain.CoinHistory.Received[idx].Amount,
 		}
 	}
-	dtoSent := make([]dto.SentTransaction, len(userDomain.CoinHistory.Sent))
+	dtoSent := make([]mainRoutDTO.SentTransaction, len(userDomain.CoinHistory.Sent))
 	for idx := range userDomain.CoinHistory.Sent {
-		dtoSent[idx] = dto.SentTransaction{
+		dtoSent[idx] = mainRoutDTO.SentTransaction{
 			ToUser: userDomain.CoinHistory.Sent[idx].ToUser,
 			Amount: userDomain.CoinHistory.Sent[idx].Amount,
 		}
 	}
 
-	dtoUser := dto.InfoResponse{
+	dtoUser := mainRoutDTO.InfoResponse{
 		Coins:     userDomain.Coins,
 		Inventory: dtoInventory,
-		CoinHistory: dto.History{
+		CoinHistory: mainRoutDTO.History{
 			Received: dtoReceived,
 			Sent:     dtoSent,
 		},

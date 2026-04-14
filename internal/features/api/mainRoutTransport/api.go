@@ -1,7 +1,7 @@
-package transport
+package mainRoutTransport
 
 import (
-	"avito-shop/internal/features/api/service"
+	"avito-shop/internal/features/api/mainRoutService"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -13,10 +13,8 @@ import (
 
 const queryTimeout = time.Second
 
-func Register(s service.Service, logger *zap.Logger) *chi.Mux {
-	r := chi.NewRouter()
-
-	r.Get("/api/info", func(w http.ResponseWriter, r *http.Request) {
+func Register(s mainRoutService.Service, r chi.Router, logger *zap.Logger) {
+	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		logger.Debug(
 			"request received",
@@ -42,7 +40,7 @@ func Register(s service.Service, logger *zap.Logger) *chi.Mux {
 		ctx, cancel := context.WithTimeout(r.Context(), queryTimeout)
 		defer cancel()
 		logger.Debug(
-			"calling service GetUserInfo method",
+			"calling mainRoutService GetUserInfo method",
 			zap.String("username", username),
 		)
 		dtoUser, err := s.GetUserInfo(ctx, username)
@@ -68,7 +66,7 @@ func Register(s service.Service, logger *zap.Logger) *chi.Mux {
 		}
 		if _, err = w.Write(response); err != nil {
 			logger.Error(
-				"failed to write response",
+				"failed to write info response",
 				zap.Error(err),
 				zap.String("username", username),
 			)
@@ -80,6 +78,4 @@ func Register(s service.Service, logger *zap.Logger) *chi.Mux {
 			zap.Duration("processing time", time.Since(start)),
 		)
 	})
-
-	return r
 }

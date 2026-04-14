@@ -1,4 +1,4 @@
-package models
+package mainRootModels
 
 type Transaction struct {
 	Id         int

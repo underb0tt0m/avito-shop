@@ -1,4 +1,4 @@
-package views
+package mainRootViews
 
 type UserInventory struct {
 	Balance  int

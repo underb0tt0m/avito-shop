@@ -1,4 +1,4 @@
-package dto
+package mainRoutDTO
 
 type InfoResponse struct {
 	Coins       int     `json:"coins"` // Количество доступных монет

@@ -2,15 +2,19 @@ package main
 
 import (
 	"avito-shop/internal/core/tools"
-	"avito-shop/internal/features/api/repository"
-	"avito-shop/internal/features/api/service"
-	"avito-shop/internal/features/api/transport"
+	"avito-shop/internal/features/api/mainRoutRepository"
+	"avito-shop/internal/features/api/mainRoutService"
+	"avito-shop/internal/features/api/mainRoutTransport"
+	"avito-shop/internal/features/auth/authRepository"
+	"avito-shop/internal/features/auth/authService"
+	"avito-shop/internal/features/auth/authTransport"
 	"context"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
 
@@ -22,8 +26,12 @@ func main() {
 	defer cancel()
 
 	conn := tools.Create(ctx, logger)
-	var repo repository.Storage = repository.StorageImpl{Conn: conn, Logger: logger}
-	var serv service.Service = service.ServiceImpl{Repo: repo, Logger: logger}
+
+	var mainRepo mainRoutRepository.Storage = mainRoutRepository.StorageImpl{Conn: conn, Logger: logger}
+	var mainServ mainRoutService.Service = mainRoutService.ServiceImpl{Repo: mainRepo, Logger: logger}
+
+	var authRepo authRepository.Storage = authRepository.StorageImpl{Conn: conn, Logger: logger}
+	var authServ authService.Service = authService.ServiceImpl{Repo: authRepo, Logger: logger}
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
@@ -33,10 +41,16 @@ func main() {
 		cancel()
 	}()
 
-	rout := transport.Register(serv, logger)
+	router := chi.NewRouter()
+
+	router.Route("/api", func(r chi.Router) {
+		mainRoutTransport.Register(mainServ, r, logger)
+		authTransport.Register(authServ, r, logger)
+	})
+
 	server := http.Server{
 		Addr:    ":8080",
-		Handler: rout,
+		Handler: router,
 	}
 
 	go func() {

@@ -1,5 +1,9 @@
 package domains
 
+import (
+	"golang.org/x/crypto/bcrypt"
+)
+
 type User struct {
 	Coins       int // Количество доступных монет
 	Inventory   []Item
@@ -24,4 +28,21 @@ type ReceivedTransaction struct {
 type SentTransaction struct {
 	ToUser string // Имя пользователя, которому отправлены монеты
 	Amount int    // Количество полученных монет
+}
+
+type HashedUserData struct {
+	Name     string
+	Password []byte
+}
+
+func NewHashed(name string, password string) (HashedUserData, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return HashedUserData{}, err
+	}
+
+	return HashedUserData{
+		Name:     name,
+		Password: hashedPassword,
+	}, nil
 }
