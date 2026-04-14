@@ -1,10 +1,11 @@
-package mainRoutRepository
+package storage
 
 import (
-	"avito-shop/internal/features/api/mainRoutRepository/mainRootViews"
 	"context"
+
+	"avito-shop/internal/features/api/mainRoutRepository/mainRootViews"
 )
 
-type Storage interface {
+type Shop interface {
 	GetUserInfo(ctx context.Context, username string) ([]mainRootViews.UserInventory, []mainRootViews.UserTransaction, error)
 }

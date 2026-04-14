@@ -1,8 +1,10 @@
-package mainRoutTransport
+package handler
 
 import (
-	"avito-shop/internal/core/middleware"
 	"avito-shop/internal/features/api/mainRoutService"
+
+	"avito-shop/internal/middleware"
+
 	"context"
 	"encoding/json"
 	"net/http"

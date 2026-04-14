@@ -1,4 +1,8 @@
-package mainRoutDTO
+package dto
+
+type ErrorResponse struct {
+	Errors string `json:"errors"` // Сообщение об ошибке, описывающее проблему
+}
 
 type InfoResponse struct {
 	Coins       int     `json:"coins"` // Количество доступных монет

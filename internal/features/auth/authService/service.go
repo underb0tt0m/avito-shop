@@ -1,11 +1,11 @@
 package authService
 
 import (
-	"avito-shop/internal/core/domains"
 	"avito-shop/internal/core/domains/domainJwt"
-	"avito-shop/internal/core/tools"
+
 	"avito-shop/internal/features/auth/authRepository"
 	"avito-shop/internal/features/auth/authTransport/authDTO"
+	"avito-shop/internal/tools"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -17,7 +17,7 @@ type ServiceImpl struct {
 }
 
 func (s ServiceImpl) Auth(data authDTO.UserData) (authDTO.ResponseBody, error) {
-	hashedUser, err := domains.NewHashed(data.Name, data.Password)
+	hashedUser, err := domain.NewHashed(data.Name, data.Password)
 	if err != nil {
 		s.Logger.Error(
 			"failed to hash password",

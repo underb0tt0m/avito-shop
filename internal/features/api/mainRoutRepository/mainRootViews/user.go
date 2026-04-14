@@ -11,3 +11,5 @@ type UserTransaction struct {
 	ToUser   string
 	Amount   int
 }
+
+// убрать

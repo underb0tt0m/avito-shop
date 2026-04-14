@@ -1,21 +1,24 @@
 package main
 
 import (
-	"avito-shop/internal/core/tools"
-	"avito-shop/internal/features/api/mainRoutRepository"
-	"avito-shop/internal/features/api/mainRoutService"
-	"avito-shop/internal/features/api/mainRoutTransport"
-	"avito-shop/internal/features/auth/authRepository"
-	"avito-shop/internal/features/auth/authService"
-	"avito-shop/internal/features/auth/authTransport"
 	"context"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"avito-shop/internal/features/api/mainRoutService"
+
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+
+	"avito-shop/cmd/api/handler"
+	"avito-shop/internal/config"
+	"avito-shop/internal/db"
+	"avito-shop/internal/features/api/mainRoutRepository"
+	"avito-shop/internal/features/auth/authRepository"
+	"avito-shop/internal/features/auth/authService"
+	"avito-shop/internal/features/auth/authTransport"
 )
 
 func main() {
@@ -25,7 +28,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	conn := tools.Create(ctx, logger)
+	var cfg config.API
+	parseConfig(&cfg, "filename")
+
+	conn := db.Create(ctx, logger)
 
 	var mainRepo mainRoutRepository.Storage = mainRoutRepository.StorageImpl{Conn: conn, Logger: logger}
 	var mainServ mainRoutService.Service = mainRoutService.ServiceImpl{Repo: mainRepo, Logger: logger}
@@ -44,7 +50,7 @@ func main() {
 	router := chi.NewRouter()
 
 	router.Route("/api", func(r chi.Router) {
-		mainRoutTransport.Register(mainServ, r, logger)
+		handler.Register(mainServ, r, logger)
 		authTransport.Register(authServ, r, logger)
 	})
 

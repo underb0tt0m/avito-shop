@@ -1,19 +1,25 @@
-package mainRoutRepository
+package postgres
 
 import (
-	"avito-shop/internal/features/api/mainRoutRepository/mainRootViews"
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
+
+	"avito-shop/internal/features/api/mainRoutRepository/mainRootViews"
 )
 
-type StorageImpl struct {
+type ShopStorage struct {
 	Conn   *pgx.Conn
 	Logger *zap.Logger
 }
 
-func (s StorageImpl) GetUserInfo(ctx context.Context, username string) ([]mainRootViews.UserInventory, []mainRootViews.UserTransaction, error) {
+var ErrNotFound = fmt.Errorf("not found")
+
+// вернуть домен
+func (s ShopStorage) GetUserInfo(ctx context.Context, username string) ([]mainRootViews.UserInventory, []mainRootViews.UserTransaction, error) {
 	userInfoStmt := `
 SELECT
 	a.balance,
@@ -24,14 +30,20 @@ LEFT JOIN user_inventories b ON a.id=b.user_id
 LEFT JOIN items c ON c.id=b.item_id
 WHERE a.name=$1
 ;`
+
+	// https://github.com/masterminds/squirrel
+
 	rows, err := s.Conn.Query(ctx, userInfoStmt, username)
 	if err != nil {
-		s.Logger.Error(
-			"failed to query user inventory",
-			zap.Error(err),
-			zap.String("username", username),
-		)
-		return nil, nil, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, ErrNotFound
+		}
+		//s.Logger.Error(
+		//	"failed to query user inventory",
+		//	zap.Error(err),
+		//	zap.String("username", username),
+		//)
+		return nil, nil, fmt.Errorf("failed to query user inventory: %w", err)
 	}
 
 	var (
