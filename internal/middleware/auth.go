@@ -1,12 +1,14 @@
 package middleware
 
 import (
-	"avito-shop/internal/core/domains/domainJwt"
-	"avito-shop/internal/core/tools"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
+
+	"avito-shop/internal/core/domains/domainJwt"
+
+	"avito-shop/internal/tools"
 )
 
 func Auth(w http.ResponseWriter, r *http.Request) (*domainJwt.DefaultUser, error) {
@@ -34,3 +36,5 @@ func Auth(w http.ResponseWriter, r *http.Request) (*domainJwt.DefaultUser, error
 	}
 	return &claims, nil
 }
+
+// metrics, logs, recover

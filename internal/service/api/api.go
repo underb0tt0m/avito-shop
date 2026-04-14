@@ -1,20 +1,32 @@
-package mainRoutService
+package api
 
 import (
-	"avito-shop/internal/core/domains"
-	"avito-shop/internal/features/api/mainRoutRepository"
-	"avito-shop/internal/features/api/mainRoutTransport/mainRoutDTO"
 	"context"
 
 	"go.uber.org/zap"
+
+	"avito-shop/cmd/api/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/features/api/mainRoutRepository"
 )
 
-type ServiceImpl struct {
+type Service interface {
+	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
+}
+
+type service struct {
 	Repo   mainRoutRepository.Storage
 	Logger *zap.Logger
 }
 
-func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*mainRoutDTO.InfoResponse, error) {
+func New(repo mainRoutRepository.Storage, logger *zap.Logger) *service {
+	return &service{
+		Repo:   repo,
+		Logger: logger,
+	}
+}
+
+func (s service) GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error) {
 	userInventories, userTransactions, err := s.Repo.GetUserInfo(ctx, username)
 	if err != nil {
 		s.Logger.Error(
@@ -36,12 +48,12 @@ func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*mainRou
 		zap.String("username", username),
 	)
 
-	var userInventory []domains.Item
+	var userInventory []domain.Item
 	for _, item := range userInventories {
 		if item.ItemName == "" {
 			break
 		}
-		userInventory = append(userInventory, domains.Item{
+		userInventory = append(userInventory, domain.Item{
 			ObjType:  item.ItemName,
 			Quantity: item.Quantity,
 		})
@@ -51,16 +63,16 @@ func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*mainRou
 		zap.String("username", username),
 	)
 
-	var receivedTransactions []domains.ReceivedTransaction
-	var sentTransactions []domains.SentTransaction
+	var receivedTransactions []domain.ReceivedTransaction
+	var sentTransactions []domain.SentTransaction
 	for _, transaction := range userTransactions {
 		if transaction.FromUser == username {
-			sentTransactions = append(sentTransactions, domains.SentTransaction{
+			sentTransactions = append(sentTransactions, domain.SentTransaction{
 				ToUser: transaction.ToUser,
 				Amount: transaction.Amount,
 			})
 		} else {
-			receivedTransactions = append(receivedTransactions, domains.ReceivedTransaction{
+			receivedTransactions = append(receivedTransactions, domain.ReceivedTransaction{
 				FromUser: transaction.FromUser,
 				Amount:   transaction.Amount,
 			})
@@ -72,41 +84,41 @@ func (s ServiceImpl) GetUserInfo(ctx context.Context, username string) (*mainRou
 		zap.String("username", username),
 	)
 
-	userDomain := domains.User{
+	userDomain := domain.User{
 		Coins:     userBalance,
 		Inventory: userInventory,
-		CoinHistory: domains.History{
+		CoinHistory: domain.History{
 			Received: receivedTransactions,
 			Sent:     sentTransactions,
 		},
 	}
 
-	dtoInventory := make([]mainRoutDTO.Item, len(userDomain.Inventory))
+	dtoInventory := make([]dto.Item, len(userDomain.Inventory))
 	for idx := range userDomain.Inventory {
-		dtoInventory[idx] = mainRoutDTO.Item{
+		dtoInventory[idx] = dto.Item{
 			ObjType:  userDomain.Inventory[idx].ObjType,
 			Quantity: userDomain.Inventory[idx].Quantity,
 		}
 	}
-	dtoReceived := make([]mainRoutDTO.ReceivedTransaction, len(userDomain.CoinHistory.Received))
+	dtoReceived := make([]dto.ReceivedTransaction, len(userDomain.CoinHistory.Received))
 	for idx := range userDomain.CoinHistory.Received {
-		dtoReceived[idx] = mainRoutDTO.ReceivedTransaction{
+		dtoReceived[idx] = dto.ReceivedTransaction{
 			FromUser: userDomain.CoinHistory.Received[idx].FromUser,
 			Amount:   userDomain.CoinHistory.Received[idx].Amount,
 		}
 	}
-	dtoSent := make([]mainRoutDTO.SentTransaction, len(userDomain.CoinHistory.Sent))
+	dtoSent := make([]dto.SentTransaction, len(userDomain.CoinHistory.Sent))
 	for idx := range userDomain.CoinHistory.Sent {
-		dtoSent[idx] = mainRoutDTO.SentTransaction{
+		dtoSent[idx] = dto.SentTransaction{
 			ToUser: userDomain.CoinHistory.Sent[idx].ToUser,
 			Amount: userDomain.CoinHistory.Sent[idx].Amount,
 		}
 	}
 
-	dtoUser := mainRoutDTO.InfoResponse{
+	dtoUser := dto.InfoResponse{
 		Coins:     userDomain.Coins,
 		Inventory: dtoInventory,
-		CoinHistory: mainRoutDTO.History{
+		CoinHistory: dto.History{
 			Received: dtoReceived,
 			Sent:     dtoSent,
 		},

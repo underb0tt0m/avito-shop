@@ -1,4 +1,4 @@
-package tools
+package db
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 
 func Create(ctx context.Context, logger *zap.Logger) *pgx.Conn {
 	connStr := "postgres://postgres:postgres@localhost:5432/avito_shop"
+	// pgxpool
+	// min=10, max=10
 	conn, err := pgx.Connect(ctx, connStr)
 	if err != nil {
 		logger.Error(
