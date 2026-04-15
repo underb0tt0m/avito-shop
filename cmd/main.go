@@ -1,24 +1,33 @@
 package main
 
 import (
-	"avito-shop/internal/core/tools"
-	"avito-shop/internal/features/api/mainRoutRepository"
-	"avito-shop/internal/features/api/mainRoutService"
-	"avito-shop/internal/features/api/mainRoutTransport"
-	"avito-shop/internal/features/auth/authRepository"
-	"avito-shop/internal/features/auth/authService"
-	"avito-shop/internal/features/auth/authTransport"
+	"avito-shop/cmd/handler"
+	"avito-shop/internal/config"
+	"avito-shop/internal/service"
+	"avito-shop/internal/storage/postgres"
+	"avito-shop/internal/tools"
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
 
 func main() {
+
+	if err := godotenv.Load(); err != nil {
+		panic(err)
+	}
+
+	if err := config.Init("cmd/config.yaml"); err != nil {
+		panic(err)
+	}
+
 	logger := zap.Must(zap.NewDevelopment())
 	defer func() { _ = logger.Sync() }()
 
@@ -27,11 +36,11 @@ func main() {
 
 	conn := tools.Create(ctx, logger)
 
-	var mainRepo mainRoutRepository.Storage = mainRoutRepository.StorageImpl{Conn: conn, Logger: logger}
-	var mainServ mainRoutService.Service = mainRoutService.ServiceImpl{Repo: mainRepo, Logger: logger}
+	storageAPI := postgres.NewStorageAPI(conn, logger)
+	serviceAPI := service.NewApi(storageAPI, logger)
 
-	var authRepo authRepository.Storage = authRepository.StorageImpl{Conn: conn, Logger: logger}
-	var authServ authService.Service = authService.ServiceImpl{Repo: authRepo, Logger: logger}
+	storageAuth := postgres.NewStorageAuth(conn, logger)
+	serviceAuth := service.NewAuth(storageAuth, logger)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
@@ -44,12 +53,12 @@ func main() {
 	router := chi.NewRouter()
 
 	router.Route("/api", func(r chi.Router) {
-		mainRoutTransport.Register(mainServ, r, logger)
-		authTransport.Register(authServ, r, logger)
+		handler.Main(serviceAPI, r, logger)
+		handler.Auth(serviceAuth, r, logger)
 	})
 
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%v", config.App.Port),
 		Handler: router,
 	}
 
