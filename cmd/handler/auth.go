@@ -2,6 +2,7 @@ package handler
 
 import (
 	"avito-shop/cmd/dto"
+	"avito-shop/internal/config"
 	"avito-shop/internal/service"
 	"context"
 	"encoding/json"
@@ -47,7 +48,7 @@ func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), queryTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
 		defer cancel()
 		logger.Debug(
 			"calling AuthService Auth method",

@@ -1,0 +1,24 @@
+server_type: "development"           # TODO
+port: "8080"
+
+storage:
+  type: "postgresql"                 # TODO
+  connection:
+    driver: "postgres"
+    host: "localhost"
+    port: "5432"
+    database: "avito_shop"
+  query_timeout: "1s"
+
+logger:                              # TODO
+  type: "zap"
+  level: "debug"
+
+security:
+  hash:
+    cost: 10 # default
+  jwt_token:
+    lifetime: "24h"
+
+
+

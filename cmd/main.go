@@ -2,20 +2,32 @@ package main
 
 import (
 	"avito-shop/cmd/handler"
+	"avito-shop/internal/config"
 	"avito-shop/internal/service"
 	"avito-shop/internal/storage/postgres"
 	"avito-shop/internal/tools"
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
 
 func main() {
+
+	if err := godotenv.Load(); err != nil {
+		panic(err)
+	}
+
+	if err := config.Init("cmd/config.yaml"); err != nil {
+		panic(err)
+	}
+
 	logger := zap.Must(zap.NewDevelopment())
 	defer func() { _ = logger.Sync() }()
 
@@ -46,7 +58,7 @@ func main() {
 	})
 
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%v", config.App.Port),
 		Handler: router,
 	}
 

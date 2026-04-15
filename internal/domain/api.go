@@ -1,6 +1,10 @@
 package domain
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"avito-shop/internal/config"
+
+	"golang.org/x/crypto/bcrypt"
+)
 
 type User struct {
 	Coins       int // Количество доступных монет
@@ -34,7 +38,7 @@ type HashedUserData struct {
 }
 
 func NewHashed(name string, password string) (HashedUserData, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), config.App.Security.Hash.Cost)
 	if err != nil {
 		return HashedUserData{}, err
 	}

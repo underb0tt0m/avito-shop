@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"avito-shop/internal/config"
 	"avito-shop/internal/middleware"
 	"avito-shop/internal/service"
 	"context"
@@ -11,8 +12,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
-
-const queryTimeout = time.Second
 
 func Main(s service.API, r chi.Router, logger *zap.Logger) {
 	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +54,7 @@ func Main(s service.API, r chi.Router, logger *zap.Logger) {
 		logger.Debug("JWT token is valid")
 		username := claims.UserName
 
-		ctx, cancel := context.WithTimeout(r.Context(), queryTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
 		defer cancel()
 		logger.Debug(
 			"calling mainRoutService GetUserInfo method",

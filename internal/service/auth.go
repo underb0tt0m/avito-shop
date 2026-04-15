@@ -39,6 +39,7 @@ func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody
 	}
 
 	DBHashedPassword, isNew, err := s.Storage.GetHashedUserPassword(ctx, hashedUser.Name)
+	DBHashedPassword = hashedUser.Password //TODO убрать после добавления репозитория с паролями
 	switch {
 	case isNew:
 		//TODO создание пользователя в БД

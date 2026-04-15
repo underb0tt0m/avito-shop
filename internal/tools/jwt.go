@@ -1,15 +1,13 @@
 package tools
 
 import (
+	"avito-shop/internal/config"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
-
-var secretKey = []byte(os.Getenv("JWT_SECRET"))
 
 func CreateToken(data any) (string, error) {
 	jsonBytes, err := json.Marshal(data)
@@ -25,12 +23,12 @@ func CreateToken(data any) (string, error) {
 		return "", err
 	}
 
-	mapClaims["exp"] = jwt.NewNumericDate(time.Now().Add(24 * time.Hour))
+	mapClaims["exp"] = jwt.NewNumericDate(time.Now().Add(config.App.Security.JWTToken.Lifetime))
 	mapClaims["iat"] = jwt.NewNumericDate(time.Now())
 	mapClaims["iss"] = "app"
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mapClaims)
-	tokenString, err := token.SignedString(secretKey)
+	tokenString, err := token.SignedString(config.App.Security.JWTToken.SecretKey)
 	if err != nil {
 		return "", err
 	}
@@ -65,5 +63,5 @@ func keyFunc(token *jwt.Token) (interface{}, error) {
 	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 		return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 	}
-	return secretKey, nil
+	return config.App.Security.JWTToken.SecretKey, nil
 }
