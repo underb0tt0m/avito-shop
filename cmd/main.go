@@ -3,6 +3,7 @@ package main
 import (
 	"avito-shop/cmd/handler"
 	"avito-shop/internal/config"
+	"avito-shop/internal/logging/logger_factory"
 	"avito-shop/internal/service"
 	"avito-shop/internal/storage/postgres"
 	"avito-shop/internal/tools"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -28,13 +28,27 @@ func main() {
 		panic(err)
 	}
 
-	logger := zap.Must(zap.NewDevelopment())
-	defer func() { _ = logger.Sync() }()
+	logger, closeLogger, err := logger_factory.New()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = logger.Sync()
+		if err = closeLogger(); err != nil {
+			panic(err)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	conn := tools.Create(ctx, logger)
+	conn, err := tools.Create(ctx)
+	if err != nil {
+		logger.Error(
+			"can't connect db",
+			err,
+		)
+	}
 
 	storageAPI := postgres.NewStorageAPI(conn, logger)
 	serviceAPI := service.NewApi(storageAPI, logger)
@@ -64,16 +78,16 @@ func main() {
 
 	go func() {
 		logger.Info("Start HTTP-server")
-		if err := server.ListenAndServe(); err != nil {
+		if err = server.ListenAndServe(); err != nil {
 			logger.Info("Stop HTTP-server")
 		}
 	}()
 
 	<-ctx.Done()
-	if err := server.Shutdown(ctx); err != nil {
+	if err = server.Shutdown(ctx); err != nil {
 		logger.Error(
 			"failed to shutdown server gracefully",
-			zap.Error(err),
+			err,
 		)
 
 	}

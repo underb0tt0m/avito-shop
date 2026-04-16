@@ -22,6 +22,31 @@ var (
 		Code:    500,
 		Message: "internal server error",
 	}
+	ErrUnauthorized = APIErr{
+		Code:    401,
+		Message: "unauthorized",
+	}
+	ErrInvalidToken = APIErr{
+		Code:    401,
+		Message: "invalid token",
+	}
+	ErrWrongSigningMethod = APIErr{
+		Code:    401,
+		Message: "unexpected signing method",
+	}
+	ErrTokenExpired = APIErr{
+		Code:    401,
+		Message: "token expired",
+	}
 )
 
-// if errors.As(err, &APIErr{})
+type AppErr struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e AppErr) Error() string {
+	return e.Message
+}
+
+var ()

@@ -1,19 +1,19 @@
 package postgres
 
 import (
+	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"go.uber.org/zap"
 )
 
 type storageAuth struct {
 	Conn   *pgx.Conn
-	Logger *zap.Logger
+	Logger logging.Logger
 }
 
-func NewStorageAuth(conn *pgx.Conn, logger *zap.Logger) storage.Auth {
+func NewStorageAuth(conn *pgx.Conn, logger logging.Logger) storage.Auth {
 	return storageAuth{
 		Conn:   conn,
 		Logger: logger,

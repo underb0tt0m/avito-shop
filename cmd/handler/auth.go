@@ -3,25 +3,30 @@ package handler
 import (
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/config"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
-func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
+func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 	r.Post("/auth", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		logger.Debug(
-			"request received",
-			zap.String("method", r.Method),
-			zap.String("pattern", r.Pattern),
-			zap.String("remoteAddr", r.RemoteAddr),
+			fmt.Sprintf(
+				"request received, method: %v, pattern: %v, remoteAddr: %v",
+				r.Method,
+				r.Pattern,
+				r.RemoteAddr,
+			),
 		)
 
 		requestBody, err := io.ReadAll(r.Body)
@@ -29,7 +34,7 @@ func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
 		if err != nil {
 			logger.Error(
 				"failed to read auth request body",
-				zap.Error(err),
+				err,
 			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -42,7 +47,7 @@ func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
 		); err != nil {
 			logger.Error(
 				"failed to unmarshal auth request body",
-				zap.Error(err),
+				err,
 			)
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -51,16 +56,28 @@ func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
 		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
 		defer cancel()
 		logger.Debug(
-			"calling AuthService Auth method",
-			zap.String("username", user.Name),
+			fmt.Sprintf(
+				"calling AuthService Auth method, username: %v",
+				user.Name,
+			),
 		)
 		token, err := s.Auth(ctx, user)
 		if err != nil {
 			logger.Warn(
-				"authentication denied",
-				zap.String("username", user.Name),
+				fmt.Sprintf(
+					"authentication denied, username: %v",
+					user.Name,
+				),
+				err,
 			)
-			w.WriteHeader(http.StatusUnauthorized)
+			switch {
+			case errors.Is(err, domain.ErrUnauthorized):
+				w.WriteHeader(domain.ErrUnauthorized.Code)
+			default:
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			// TODO логика проверки ошибки и выдачи статуса
+
 			return
 		}
 
@@ -68,7 +85,7 @@ func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
 		if err != nil {
 			logger.Error(
 				"failed to marshal auth response body",
-				zap.Error(err),
+				err,
 			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -77,16 +94,18 @@ func Auth(s service.Auth, r chi.Router, logger *zap.Logger) {
 		if _, err = w.Write(responseBody); err != nil {
 			logger.Error(
 				"failed to write auth response",
-				zap.Error(err),
+				err,
 			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		logger.Debug(
-			"request has been processed",
-			zap.Int("status", http.StatusOK),
-			zap.Duration("processing time", time.Since(start)),
+			fmt.Sprintf(
+				"request has been processed, status: %v, processing time: %v",
+				http.StatusOK,
+				time.Since(start),
+			),
 		)
 	})
 }

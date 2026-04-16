@@ -3,10 +3,9 @@ package service
 import (
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
 	"context"
-
-	"go.uber.org/zap"
 )
 
 type API interface {
@@ -14,10 +13,10 @@ type API interface {
 }
 type api struct {
 	Storage storage.API
-	Logger  *zap.Logger
+	Logger  logging.Logger
 }
 
-func NewApi(s storage.API, l *zap.Logger) API {
+func NewApi(s storage.API, l logging.Logger) API {
 	return api{
 		Storage: s,
 		Logger:  l,
@@ -29,22 +28,14 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 	if err != nil {
 		s.Logger.Error(
 			"failed to get user info from mainRoutRepository",
-			zap.Error(err),
-			zap.String("username", username),
+			err,
 		)
 		return nil, err
 	}
-	s.Logger.Debug("received data from mainRoutRepository",
-		zap.Int("inventory_count", len(userInventories)),
-		zap.Int("transactions_count", len(userTransactions)),
-		zap.String("username", username),
-	)
+	s.Logger.Debug("received data from mainRoutRepository")
 
 	userBalance := userInventories[0].Balance
-	s.Logger.Debug("user balance extracted",
-		zap.Int("balance", userBalance),
-		zap.String("username", username),
-	)
+	s.Logger.Debug("user balance extracted")
 
 	var userInventory []domain.Item
 	for _, item := range userInventories {
@@ -56,10 +47,7 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 			Quantity: item.Quantity,
 		})
 	}
-	s.Logger.Debug("inventory mapped",
-		zap.Int("items_count", len(userInventory)),
-		zap.String("username", username),
-	)
+	s.Logger.Debug("inventory mapped")
 
 	var receivedTransactions []domain.ReceivedTransaction
 	var sentTransactions []domain.SentTransaction
@@ -76,11 +64,7 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 			})
 		}
 	}
-	s.Logger.Debug("transactions mapped",
-		zap.Int("received_count", len(receivedTransactions)),
-		zap.Int("sent_count", len(sentTransactions)),
-		zap.String("username", username),
-	)
+	s.Logger.Debug("transactions mapped")
 
 	userDomain := domain.User{
 		Coins:     userBalance,
@@ -122,13 +106,7 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 		},
 	}
 
-	s.Logger.Debug("preparing response",
-		zap.Int("coins", dtoUser.Coins),
-		zap.Int("inventory_items", len(dtoUser.Inventory)),
-		zap.Int("received_transactions", len(dtoUser.CoinHistory.Received)),
-		zap.Int("sent_transactions", len(dtoUser.CoinHistory.Sent)),
-		zap.String("username", username),
-	)
+	s.Logger.Debug("preparing response")
 
 	return &dtoUser, nil
 }

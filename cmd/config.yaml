@@ -11,7 +11,7 @@ storage:
   query_timeout: "1s"
 
 logger:                              # TODO
-  type: "zap"
+  type: "zap_logging"
   level: "debug"
 
 security:
