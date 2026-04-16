@@ -102,7 +102,5 @@ func New() (logging.Logger, func() error, error) {
 		zap.AddStacktrace(zapcore.ErrorLevel),
 	)
 
-	l.Info("Log file created")
-
 	return logger{l}, logFile.Close, nil
 }

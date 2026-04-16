@@ -6,11 +6,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func CreateTables(ctx context.Context, conn *pgx.Conn) {
+func CreateMainTables(ctx context.Context, conn *pgx.Conn) {
 	stmt := `
 CREATE TABLE users(
 	id BIGSERIAL PRIMARY KEY,
 	name VARCHAR(20) NOT NULL UNIQUE,
+	password_hash BYTEA NOT NULL,
 	balance INT NOT NULL CHECK ( balance >= 0 ) DEFAULT 1000
 );
 
