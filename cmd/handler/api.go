@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"avito-shop/cmd/dto"
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
@@ -10,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -32,18 +34,12 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrUnauthorized):
-				logger.Warn(
-					"user is unauthorized",
-					domain.ErrUnauthorized,
-				)
 				w.WriteHeader(domain.ErrUnauthorized.Code)
 				return
 			case errors.Is(err, domain.ErrTokenExpired):
-				logger.Info("user's token has expired")
 				w.WriteHeader(domain.ErrTokenExpired.Code)
 				return
 			case errors.Is(err, domain.ErrBadRequest):
-				logger.Debug("bad request")
 				w.WriteHeader(domain.ErrBadRequest.Code)
 				return
 			default:
@@ -84,6 +80,87 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 			)
 			w.WriteHeader(domain.ErrInternalServerError.Code)
 		}
+		logger.Debug(
+			fmt.Sprintf(
+				"request has been processed, status: %v, processing time: %v",
+				http.StatusOK,
+				time.Since(start),
+			),
+		)
+	})
+
+	r.Post("/sendCoin", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		logger.Debug(
+			fmt.Sprintf(
+				"request received, method: %v, pattern: %v, remoteAddr: %v",
+				r.Method,
+				r.Pattern,
+				r.RemoteAddr,
+			),
+		)
+
+		requestBody, err := io.ReadAll(r.Body)
+		defer func() { _ = r.Body.Close() }()
+		if err != nil {
+			logger.Error(
+				"failed to read request body",
+				err,
+			)
+			w.WriteHeader(domain.ErrInternalServerError.Code)
+			return
+		}
+
+		transaction := dto.SendCoinRequest{}
+		if err = json.Unmarshal(
+			requestBody,
+			&transaction,
+		); err != nil {
+			logger.Error(
+				"failed to unmarshal request body",
+				err,
+			)
+			w.WriteHeader(domain.ErrInternalServerError.Code)
+			return
+		}
+
+		sender, err := middleware.Auth(w, r, logger)
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrInvalidToken):
+				w.WriteHeader(domain.ErrInvalidToken.Code)
+			case errors.Is(err, domain.ErrUnauthorized):
+				w.WriteHeader(domain.ErrUnauthorized.Code)
+			case errors.Is(err, domain.ErrBadRequest):
+				w.WriteHeader(domain.ErrBadRequest.Code)
+			case errors.Is(err, domain.ErrTokenExpired):
+				w.WriteHeader(domain.ErrTokenExpired.Code)
+			default:
+				w.WriteHeader(domain.ErrInternalServerError.Code)
+			}
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
+		defer cancel()
+		if err = s.SendCoins(
+			ctx,
+			sender.UserName,
+			transaction,
+		); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrInsufficientFunds):
+				w.WriteHeader(domain.ErrInsufficientFunds.Code)
+			case errors.Is(err, domain.ErrNotFound):
+				w.WriteHeader(domain.ErrNotFound.Code)
+			case errors.Is(err, domain.ErrBadRequest):
+				w.WriteHeader(domain.ErrBadRequest.Code)
+			default:
+				w.WriteHeader(domain.ErrInternalServerError.Code)
+			}
+			return
+		}
+
 		logger.Debug(
 			fmt.Sprintf(
 				"request has been processed, status: %v, processing time: %v",

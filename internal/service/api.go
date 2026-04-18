@@ -10,6 +10,7 @@ import (
 
 type API interface {
 	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
+	SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error
 }
 type api struct {
 	Storage storage.API
@@ -109,4 +110,27 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 	s.Logger.Debug("preparing response")
 
 	return &dtoUser, nil
+}
+
+func (s api) SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error {
+	if toUser.Amount <= 0 {
+		s.Logger.Warn(
+			"attempt to send unnatural amount of coins",
+			domain.ErrBadRequest)
+		return domain.ErrBadRequest
+	}
+
+	transaction := domain.SentTransaction{
+		ToUser: toUser.ToUser,
+		Amount: toUser.Amount,
+	}
+	if err := s.Storage.SendCoins(
+		ctx,
+		fromUser,
+		transaction,
+	); err != nil {
+		return err
+	}
+
+	return nil
 }

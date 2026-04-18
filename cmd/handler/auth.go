@@ -40,7 +40,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 			return
 		}
 
-		user := dto.UserData{}
+		user := dto.AuthRequest{}
 		if err = json.Unmarshal(
 			requestBody,
 			&user,

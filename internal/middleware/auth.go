@@ -12,6 +12,10 @@ import (
 func Auth(w http.ResponseWriter, r *http.Request, logger logging.Logger) (*domain.DefaultUser, error) {
 	token := r.Header.Get("Authorization")
 	if token == "" {
+		logger.Warn(
+			"user unauthorized",
+			domain.ErrUnauthorized,
+		)
 		return nil, domain.ErrUnauthorized
 	}
 	jsonBytes, err := tools.ParseUserTokenRaw(token, logger)
@@ -23,10 +27,18 @@ func Auth(w http.ResponseWriter, r *http.Request, logger logging.Logger) (*domai
 		jsonBytes,
 		&claims,
 	); err != nil {
+		logger.Error(
+			"failed to unmarshal token",
+			err,
+		)
 		return nil, domain.ErrBadRequest
 	}
 
 	if claims.ExpiresAt.Unix() < time.Now().Unix() {
+		logger.Warn(
+			"token is expired",
+			domain.ErrTokenExpired,
+		)
 		return nil, domain.ErrTokenExpired
 	}
 	return &claims, nil

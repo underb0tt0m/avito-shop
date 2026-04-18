@@ -38,6 +38,10 @@ var (
 		Code:    401,
 		Message: "token expired",
 	}
+	ErrInsufficientFunds = APIErr{
+		Code:    402,
+		Message: "insufficient funds",
+	}
 )
 
 type AppErr struct {
