@@ -6,10 +6,9 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"go.uber.org/zap"
 )
 
-func Create(ctx context.Context, logger *zap.Logger) *pgx.Conn {
+func Create(ctx context.Context) (*pgx.Conn, error) {
 	connStr := fmt.Sprintf(
 		"%v://%v:%v@%v:%v/%v",
 		config.App.Storage.Connection.Driver,
@@ -21,11 +20,7 @@ func Create(ctx context.Context, logger *zap.Logger) *pgx.Conn {
 	)
 	conn, err := pgx.Connect(ctx, connStr)
 	if err != nil {
-		logger.Error(
-			"failed to connect to database",
-			zap.Error(err),
-			zap.String("conn_string", connStr),
-		)
+		return nil, err
 	}
-	return conn
+	return conn, nil
 }

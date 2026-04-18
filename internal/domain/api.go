@@ -2,6 +2,8 @@ package domain
 
 import (
 	"avito-shop/internal/config"
+	"avito-shop/internal/logging"
+	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -37,9 +39,17 @@ type HashedUserData struct {
 	Password []byte
 }
 
-func NewHashed(name string, password string) (HashedUserData, error) {
+func NewHashed(name string, password string, logger logging.Logger) (HashedUserData, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), config.App.Security.Hash.Cost)
 	if err != nil {
+		logger.Error(
+			fmt.Sprintf(
+				"failed to hash password for user: %v",
+				name,
+			),
+			err,
+		)
+
 		return HashedUserData{}, err
 	}
 

@@ -2,51 +2,52 @@ package handler
 
 import (
 	"avito-shop/internal/config"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
 	"avito-shop/internal/middleware"
 	"avito-shop/internal/service"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
-func Main(s service.API, r chi.Router, logger *zap.Logger) {
+func Main(s service.API, r chi.Router, logger logging.Logger) {
 	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		logger.Debug(
-			"request received",
-			zap.String("method", r.Method),
-			zap.String("pattern", r.Pattern),
-			zap.String("remoteAddr", r.RemoteAddr),
+			fmt.Sprintf(
+				"request received, method: %v, pattern: %v, remoteAddr: %v",
+				r.Method,
+				r.Pattern,
+				r.RemoteAddr,
+			),
 		)
 
-		claims, err := middleware.Auth(w, r)
+		claims, err := middleware.Auth(w, r, logger)
 		if err != nil {
-			switch err.Error() {
-			case "unauthorized":
-				logger.Warn("user is unauthorized")
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			case "token expired":
-				logger.Info(
-					"user's token has expired",
-					zap.String("username", claims.UserName),
+			switch {
+			case errors.Is(err, domain.ErrUnauthorized):
+				logger.Warn(
+					"user is unauthorized",
+					domain.ErrUnauthorized,
 				)
-				w.WriteHeader(http.StatusUnauthorized)
+				w.WriteHeader(domain.ErrUnauthorized.Code)
 				return
-			case "token is malformed: token contains an invalid number of segment":
+			case errors.Is(err, domain.ErrTokenExpired):
+				logger.Info("user's token has expired")
+				w.WriteHeader(domain.ErrTokenExpired.Code)
+				return
+			case errors.Is(err, domain.ErrBadRequest):
 				logger.Debug("bad request")
-				w.WriteHeader(http.StatusBadRequest)
+				w.WriteHeader(domain.ErrBadRequest.Code)
 				return
 			default:
-				logger.Info(
-					"failed to validate user's token",
-					zap.Error(err),
-				)
-				w.WriteHeader(http.StatusInternalServerError)
+				w.WriteHeader(domain.ErrInternalServerError.Code)
 				return
 			}
 		}
@@ -56,19 +57,15 @@ func Main(s service.API, r chi.Router, logger *zap.Logger) {
 
 		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
 		defer cancel()
-		logger.Debug(
-			"calling mainRoutService GetUserInfo method",
-			zap.String("username", username),
-		)
+		logger.Debug("calling mainRoutService GetUserInfo method")
 		dtoUser, err := s.GetUserInfo(ctx, username)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
 			//TODO реализовать логику с вытягиванием статуса и тела ошибки
-			logger.Error(
-				"failed to get user info",
-				zap.Error(err),
-				zap.String("username", username),
-			)
+			switch {
+			case false:
+			default:
+				w.WriteHeader(domain.ErrInternalServerError.Code)
+			}
 			return
 		}
 
@@ -76,23 +73,23 @@ func Main(s service.API, r chi.Router, logger *zap.Logger) {
 		if err != nil {
 			logger.Error(
 				"failed to marshal user info response",
-				zap.Error(err),
-				zap.String("username", username),
+				err,
 			)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(domain.ErrInternalServerError.Code)
 		}
 		if _, err = w.Write(response); err != nil {
 			logger.Error(
 				"failed to write info response",
-				zap.Error(err),
-				zap.String("username", username),
+				err,
 			)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(domain.ErrInternalServerError.Code)
 		}
 		logger.Debug(
-			"request has been processed",
-			zap.Int("status", http.StatusOK),
-			zap.Duration("processing time", time.Since(start)),
+			fmt.Sprintf(
+				"request has been processed, status: %v, processing time: %v",
+				http.StatusOK,
+				time.Since(start),
+			),
 		)
 	})
 }

@@ -1,20 +1,20 @@
 package postgres
 
 import (
+	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
 	"avito-shop/internal/storage/views"
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"go.uber.org/zap"
 )
 
 type storageAPI struct {
 	Conn   *pgx.Conn
-	Logger *zap.Logger
+	Logger logging.Logger
 }
 
-func NewStorageAPI(conn *pgx.Conn, logger *zap.Logger) storage.API {
+func NewStorageAPI(conn *pgx.Conn, logger logging.Logger) storage.API {
 	return storageAPI{
 		Conn:   conn,
 		Logger: logger,
@@ -36,8 +36,7 @@ WHERE a.name=$1
 	if err != nil {
 		s.Logger.Error(
 			"failed to query user inventory",
-			zap.Error(err),
-			zap.String("username", username),
+			err,
 		)
 		return nil, nil, err
 	}
@@ -56,8 +55,7 @@ WHERE a.name=$1
 		); err != nil {
 			s.Logger.Error(
 				"failed to scan user inventory row",
-				zap.Error(err),
-				zap.String("username", username),
+				err,
 			)
 			return nil, nil, err
 		}
@@ -97,8 +95,7 @@ WHERE b.name=$1 OR c.name=$1
 	if err != nil {
 		s.Logger.Error(
 			"failed to query user transactions",
-			zap.Error(err),
-			zap.String("username", username),
+			err,
 		)
 		return nil, nil, err
 	}
@@ -111,8 +108,7 @@ WHERE b.name=$1 OR c.name=$1
 		); err != nil {
 			s.Logger.Error(
 				"failed to scan user transaction row",
-				zap.Error(err),
-				zap.String("username", username),
+				err,
 			)
 			return nil, nil, err
 		}

@@ -3,11 +3,12 @@ package service
 import (
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
 	"avito-shop/internal/tools"
 	"context"
+	"fmt"
 
-	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,10 +18,10 @@ type Auth interface {
 
 type auth struct {
 	Storage storage.Auth
-	Logger  *zap.Logger
+	Logger  logging.Logger
 }
 
-func NewAuth(s storage.Auth, l *zap.Logger) Auth {
+func NewAuth(s storage.Auth, l logging.Logger) Auth {
 	return auth{
 		Storage: s,
 		Logger:  l,
@@ -28,13 +29,8 @@ func NewAuth(s storage.Auth, l *zap.Logger) Auth {
 }
 
 func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody, error) {
-	hashedUser, err := domain.NewHashed(data.Name, data.Password)
+	hashedUser, err := domain.NewHashed(data.Name, data.Password, s.Logger)
 	if err != nil {
-		s.Logger.Error(
-			"failed to hash password",
-			zap.String("username", data.Name),
-			zap.Error(err),
-		)
 		return dto.AuthResponseBody{}, err
 	}
 
@@ -44,15 +40,25 @@ func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody
 	case isNew:
 		//TODO создание пользователя в БД
 		s.Logger.Info(
-			"new user created",
-			zap.String("username", hashedUser.Name),
+			fmt.Sprintf(
+				"new user created: %v",
+				hashedUser.Name,
+			),
 		)
 	case err != nil:
-		s.Logger.Error(
-			"failed to get user password from Storage",
-			zap.String("username", hashedUser.Name),
-			zap.Error(err),
-		)
+		// TODO Логика с типом ошибок
+		switch {
+		case false:
+		default:
+			s.Logger.Error(
+				fmt.Sprintf(
+					"failed to get user password from Storage, username: %v",
+					hashedUser.Name,
+				),
+				err,
+			)
+		}
+
 		return dto.AuthResponseBody{}, err
 	}
 
@@ -61,24 +67,19 @@ func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody
 		[]byte(data.Password),
 	); err != nil {
 		s.Logger.Warn(
-			"wrong password",
-			zap.String("username", hashedUser.Name),
-			zap.ByteString("your", hashedUser.Password),
-			zap.ByteString("true", DBHashedPassword),
-			zap.Error(err),
+			fmt.Sprintf(
+				"wrong password: %v",
+				hashedUser.Name,
+			),
+			domain.ErrUnauthorized,
 		)
 
-		return dto.AuthResponseBody{}, err
+		return dto.AuthResponseBody{}, domain.ErrUnauthorized
 	}
 
 	userClaims := domain.DefaultUser{UserName: hashedUser.Name}
-	token, err := tools.CreateToken(userClaims)
+	token, err := tools.CreateToken(userClaims, s.Logger)
 	if err != nil {
-		s.Logger.Error(
-			"failed to generate token",
-			zap.String("username", hashedUser.Name),
-			zap.Error(err),
-		)
 		return dto.AuthResponseBody{}, err
 	}
 
