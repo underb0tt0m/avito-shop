@@ -237,3 +237,100 @@ WHERE u1.name = $2 AND u2.name = $3;
 
 	return nil
 }
+
+func (s storageAPI) BuyItem(ctx context.Context, itemID int, user string) error {
+	tx, err := s.Conn.Begin(ctx)
+	if err != nil {
+		s.Logger.Error(
+			"failed to begin transaction",
+			err,
+		)
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	selectStmt := `
+SELECT price
+FROM items
+WHERE id = $1;
+`
+	updateStmt := `
+UPDATE users
+SET balance = balance - $1
+WHERE name = $2
+RETURNING id;
+`
+	insertStmt := `
+INSERT INTO user_inventories (user_id, item_id, quantity)
+VALUES ($1, $2, 1)
+ON CONFLICT (user_id, item_id) DO UPDATE
+SET quantity = user_inventories.quantity + 1;
+`
+	var itemPrice int
+	if err = tx.QueryRow(
+		ctx,
+		selectStmt,
+		itemID,
+	).Scan(&itemPrice); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.Logger.Warn(
+				"attempt to buy nonexistent item",
+				err,
+			)
+			return domain.ErrNotFound
+		}
+		s.Logger.Error(
+			"failed to get item cost",
+			err,
+		)
+		return domain.ErrInternalServerError
+	}
+
+	var userID int
+	if err = tx.QueryRow(
+		ctx,
+		updateStmt,
+		itemPrice,
+		user,
+	).Scan(&userID); err != nil {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+			if pgErr.Code == "23514" {
+				s.Logger.Warn(
+					"attempt to transfer money with insufficient balance",
+					err)
+				return domain.ErrInsufficientFunds
+			}
+		}
+
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.Logger.Warn(
+				"user doesn't exist",
+				err,
+			)
+			return domain.ErrNotFound
+		}
+		s.Logger.Error(
+			"failed to update user balance",
+			err,
+		)
+		return domain.ErrInternalServerError
+	}
+
+	if _, err = tx.Exec(ctx, insertStmt, userID, itemID); err != nil {
+		s.Logger.Error(
+			"failed to insert row in user_inventories",
+			err,
+		)
+		return domain.ErrInternalServerError
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		s.Logger.Error(
+			"failed to commit transaction",
+			err,
+		)
+		return domain.ErrInternalServerError
+	}
+
+	return nil
+}

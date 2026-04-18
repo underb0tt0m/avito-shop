@@ -11,6 +11,7 @@ import (
 type API interface {
 	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
 	SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error
+	BuyItem(ctx context.Context, itemID int, user string) error
 }
 type api struct {
 	Storage storage.API
@@ -133,4 +134,8 @@ func (s api) SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoin
 	}
 
 	return nil
+}
+
+func (s api) BuyItem(ctx context.Context, itemID int, user string) error {
+	return s.Storage.BuyItem(ctx, itemID, user)
 }
