@@ -1,15 +1,17 @@
 package middleware
 
 import (
+	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/tools"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 )
 
-func Auth(w http.ResponseWriter, r *http.Request, logger logging.Logger) (*domain.DefaultUser, error) {
+func Auth(r *http.Request, logger logging.Logger) (*domain.DefaultUser, error) {
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		logger.Warn(
@@ -18,6 +20,15 @@ func Auth(w http.ResponseWriter, r *http.Request, logger logging.Logger) (*domai
 		)
 		return nil, domain.ErrUnauthorized
 	}
+	token, ok := strings.CutPrefix(token, config.App.Security.JWTToken.Prefix)
+	if !ok {
+		logger.Warn(
+			"Token without prefix",
+			domain.ErrInvalidToken,
+		)
+		return nil, domain.ErrInvalidToken
+	}
+	token = strings.TrimSpace(token)
 	jsonBytes, err := tools.ParseUserTokenRaw(token, logger)
 	if err != nil {
 		return nil, err

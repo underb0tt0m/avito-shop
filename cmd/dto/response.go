@@ -29,7 +29,7 @@ type SentTransaction struct {
 
 // DTO успешного ответа на POST /api/login
 type AuthResponse struct {
-	Token string
+	Token string `json:"token"`
 }
 
 // DTO ответа с ошибкой на все запросы

@@ -31,22 +31,10 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 			),
 		)
 
-		claims, err := middleware.Auth(w, r, logger)
+		claims, err := middleware.Auth(r, logger)
 		if err != nil {
-			switch {
-			case errors.Is(err, domain.ErrUnauthorized):
-				w.WriteHeader(domain.ErrUnauthorized.Code)
-				return
-			case errors.Is(err, domain.ErrTokenExpired):
-				w.WriteHeader(domain.ErrTokenExpired.Code)
-				return
-			case errors.Is(err, domain.ErrBadRequest):
-				w.WriteHeader(domain.ErrBadRequest.Code)
-				return
-			default:
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-				return
-			}
+			WriteError(w, err)
+			return
 		}
 
 		logger.Debug("JWT token is valid")
@@ -57,12 +45,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 		logger.Debug("calling mainRoutService GetUserInfo method")
 		dtoUser, err := s.GetUserInfo(ctx, username)
 		if err != nil {
-			//TODO реализовать логику с вытягиванием статуса и тела ошибки
-			switch {
-			case false:
-			default:
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-			}
+			WriteError(w, err)
 			return
 		}
 
@@ -72,14 +55,16 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 				"failed to marshal user info response",
 				err,
 			)
-			w.WriteHeader(domain.ErrInternalServerError.Code)
+			WriteError(w, err)
+			return
 		}
 		if _, err = w.Write(response); err != nil {
 			logger.Error(
 				"failed to write info response",
 				err,
 			)
-			w.WriteHeader(domain.ErrInternalServerError.Code)
+			WriteError(w, err)
+			return
 		}
 		logger.Debug(
 			fmt.Sprintf(
@@ -108,7 +93,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 				"failed to read request body",
 				err,
 			)
-			w.WriteHeader(domain.ErrInternalServerError.Code)
+			WriteError(w, err)
 			return
 		}
 
@@ -121,24 +106,13 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 				"failed to unmarshal request body",
 				err,
 			)
-			w.WriteHeader(domain.ErrInternalServerError.Code)
+			WriteError(w, err)
 			return
 		}
 
-		sender, err := middleware.Auth(w, r, logger)
+		sender, err := middleware.Auth(r, logger)
 		if err != nil {
-			switch {
-			case errors.Is(err, domain.ErrInvalidToken):
-				w.WriteHeader(domain.ErrInvalidToken.Code)
-			case errors.Is(err, domain.ErrUnauthorized):
-				w.WriteHeader(domain.ErrUnauthorized.Code)
-			case errors.Is(err, domain.ErrBadRequest):
-				w.WriteHeader(domain.ErrBadRequest.Code)
-			case errors.Is(err, domain.ErrTokenExpired):
-				w.WriteHeader(domain.ErrTokenExpired.Code)
-			default:
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-			}
+			WriteError(w, err)
 			return
 		}
 
@@ -149,16 +123,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 			sender.UserName,
 			transaction,
 		); err != nil {
-			switch {
-			case errors.Is(err, domain.ErrInsufficientFunds):
-				w.WriteHeader(domain.ErrInsufficientFunds.Code)
-			case errors.Is(err, domain.ErrNotFound):
-				w.WriteHeader(domain.ErrNotFound.Code)
-			case errors.Is(err, domain.ErrBadRequest):
-				w.WriteHeader(domain.ErrBadRequest.Code)
-			default:
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-			}
+			WriteError(w, err)
 			return
 		}
 
@@ -171,7 +136,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 		)
 	})
 
-	r.Post("/buy/{item}", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/buy/{itemID}", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		logger.Debug(
 			fmt.Sprintf(
@@ -182,30 +147,19 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 			),
 		)
 
-		user, err := middleware.Auth(w, r, logger)
+		user, err := middleware.Auth(r, logger)
 		if err != nil {
-			switch {
-			case errors.Is(err, domain.ErrInvalidToken):
-				w.WriteHeader(domain.ErrInvalidToken.Code)
-			case errors.Is(err, domain.ErrUnauthorized):
-				w.WriteHeader(domain.ErrUnauthorized.Code)
-			case errors.Is(err, domain.ErrBadRequest):
-				w.WriteHeader(domain.ErrBadRequest.Code)
-			case errors.Is(err, domain.ErrTokenExpired):
-				w.WriteHeader(domain.ErrTokenExpired.Code)
-			default:
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-			}
+			WriteError(w, err)
 			return
 		}
 
-		strItemID := chi.URLParam(r, "item")
+		strItemID := chi.URLParam(r, "itemID")
 		if strItemID == "" {
 			logger.Warn(
 				"attempt to buy item with empty param {item}",
 				domain.ErrBadRequest,
 			)
-			w.WriteHeader(domain.ErrBadRequest.Code)
+			WriteError(w, domain.ErrBadRequest)
 			return
 		}
 
@@ -215,23 +169,14 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 				"attempt to buy item with invalid id",
 				domain.ErrBadRequest,
 			)
-			w.WriteHeader(domain.ErrBadRequest.Code)
+			WriteError(w, domain.ErrBadRequest)
 			return
 		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
 		defer cancel()
 		if err = s.BuyItem(ctx, itemID, user.UserName); err != nil {
-			switch {
-			case errors.Is(err, domain.ErrNotFound):
-				w.WriteHeader(domain.ErrNotFound.Code)
-			case errors.Is(err, domain.ErrInsufficientFunds):
-				w.WriteHeader(domain.ErrInsufficientFunds.Code)
-			case errors.Is(err, domain.ErrInternalServerError):
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-			default:
-				w.WriteHeader(domain.ErrInternalServerError.Code)
-			}
+			WriteError(w, err)
 			return
 		}
 
@@ -243,4 +188,15 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 			),
 		)
 	})
+}
+
+func WriteError(w http.ResponseWriter, err error) {
+	if apiErr, ok := errors.AsType[domain.APIErr](err); ok {
+		w.WriteHeader(apiErr.Code)
+		_, _ = w.Write([]byte(apiErr.Message))
+		return
+	}
+	w.WriteHeader(domain.ErrInternalServerError.Code)
+	_, _ = w.Write([]byte(domain.ErrInternalServerError.Message))
+	return
 }

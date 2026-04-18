@@ -99,6 +99,7 @@ func New() (logging.Logger, func() error, error) {
 	l := zap.New(
 		core,
 		zap.AddCaller(),
+		zap.AddCallerSkip(1),
 		zap.AddStacktrace(zapcore.ErrorLevel),
 	)
 
