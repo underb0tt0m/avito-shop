@@ -51,7 +51,7 @@ WHERE a.name=$1
 	)
 	defer rows.Close()
 	for rows.Next() {
-		if err := rows.Scan(
+		if err = rows.Scan(
 			&balance,
 			&itemName,
 			&quantity,

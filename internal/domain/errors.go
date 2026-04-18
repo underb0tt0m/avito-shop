@@ -12,45 +12,34 @@ func (e APIErr) Error() string {
 var (
 	ErrNotFound = APIErr{
 		Code:    404,
-		Message: "not found",
+		Message: "user or item not found",
 	}
 	ErrBadRequest = APIErr{
 		Code:    400,
-		Message: "bad request",
+		Message: "invalid request format or parameters",
 	}
 	ErrInternalServerError = APIErr{
 		Code:    500,
-		Message: "internal server error",
+		Message: "internal server error, please try again later",
 	}
 	ErrUnauthorized = APIErr{
 		Code:    401,
-		Message: "unauthorized",
+		Message: "authorization required",
 	}
 	ErrInvalidToken = APIErr{
 		Code:    401,
-		Message: "invalid token",
+		Message: "invalid or malformed token",
 	}
 	ErrWrongSigningMethod = APIErr{
 		Code:    401,
-		Message: "unexpected signing method",
+		Message: "unsupported token signing method",
 	}
 	ErrTokenExpired = APIErr{
 		Code:    401,
-		Message: "token expired",
+		Message: "token has expired, please login again",
 	}
 	ErrInsufficientFunds = APIErr{
 		Code:    402,
-		Message: "insufficient funds",
+		Message: "insufficient coins balance",
 	}
 )
-
-type AppErr struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-func (e AppErr) Error() string {
-	return e.Message
-}
-
-var ()

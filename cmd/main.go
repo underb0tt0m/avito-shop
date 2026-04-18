@@ -44,7 +44,7 @@ func main() {
 
 	conn, err := tools.Create(ctx)
 	if err != nil {
-		logger.Error(
+		logger.Fatal(
 			"can't connect db",
 			err,
 		)

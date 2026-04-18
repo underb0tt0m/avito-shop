@@ -3,12 +3,10 @@ package handler
 import (
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/config"
-	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +34,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to read auth request body",
 				err,
 			)
-			w.WriteHeader(http.StatusInternalServerError)
+			WriteError(w, err)
 			return
 		}
 
@@ -49,7 +47,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to unmarshal auth request body",
 				err,
 			)
-			w.WriteHeader(http.StatusBadRequest)
+			WriteError(w, err)
 			return
 		}
 
@@ -70,14 +68,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				),
 				err,
 			)
-			switch {
-			case errors.Is(err, domain.ErrUnauthorized):
-				w.WriteHeader(domain.ErrUnauthorized.Code)
-			default:
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-			// TODO логика проверки ошибки и выдачи статуса
-
+			WriteError(w, err)
 			return
 		}
 
@@ -87,7 +78,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to marshal auth response body",
 				err,
 			)
-			w.WriteHeader(http.StatusInternalServerError)
+			WriteError(w, err)
 			return
 		}
 
@@ -96,7 +87,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to write auth response",
 				err,
 			)
-			w.WriteHeader(http.StatusInternalServerError)
+			WriteError(w, err)
 			return
 		}
 

@@ -45,6 +45,7 @@ type Hash struct {
 type JWTToken struct {
 	SecretKey []byte
 	Lifetime  time.Duration `yaml:"lifetime"`
+	Prefix    string        `yaml:"prefix"`
 }
 
 var App *Config

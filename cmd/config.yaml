@@ -16,9 +16,10 @@ logger:                              # TODO
 
 security:
   hash:
-    cost: 10 # default
+    cost: 10
   jwt_token:
     lifetime: "24h"
+    prefix: "Bearer"
 
 
 
