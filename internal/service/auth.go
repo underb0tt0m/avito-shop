@@ -15,7 +15,7 @@ import (
 )
 
 type Auth interface {
-	Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody, error)
+	Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse, error)
 }
 
 type auth struct {
@@ -30,10 +30,10 @@ func NewAuth(s storage.Auth, l logging.Logger) Auth {
 	}
 }
 
-func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody, error) {
+func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse, error) {
 	hashedUser, err := domain.NewHashed(data.Name, data.Password, s.Logger)
 	if err != nil {
-		return dto.AuthResponseBody{}, err
+		return dto.AuthResponse{}, err
 	}
 
 	DBHashedPassword, err := s.Storage.GetHashedUserPassword(ctx, hashedUser.Name)
@@ -41,14 +41,14 @@ func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody
 	case errors.Is(err, pgx.ErrNoRows):
 		DBHashedPassword, err = s.Storage.CreateUser(ctx, hashedUser)
 		if err != nil {
-			return dto.AuthResponseBody{}, fmt.Errorf(
+			return dto.AuthResponse{}, fmt.Errorf(
 				"failed to create new user: %v",
 				err,
 			)
 		}
 		s.Logger.Info("create new user")
 	case err != nil:
-		return dto.AuthResponseBody{}, fmt.Errorf(
+		return dto.AuthResponse{}, fmt.Errorf(
 			"failed to get user password from Storage: %v",
 			err,
 		)
@@ -67,14 +67,14 @@ func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody
 			domain.ErrUnauthorized,
 		)
 
-		return dto.AuthResponseBody{}, domain.ErrUnauthorized
+		return dto.AuthResponse{}, domain.ErrUnauthorized
 	}
 
 	userClaims := domain.DefaultUser{UserName: hashedUser.Name}
 	token, err := tools.CreateToken(userClaims, s.Logger)
 	if err != nil {
-		return dto.AuthResponseBody{}, err
+		return dto.AuthResponse{}, err
 	}
 
-	return dto.AuthResponseBody{Token: token}, nil
+	return dto.AuthResponse{Token: token}, nil
 }

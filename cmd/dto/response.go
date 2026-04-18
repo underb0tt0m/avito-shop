@@ -28,7 +28,7 @@ type SentTransaction struct {
 }
 
 // DTO успешного ответа на POST /api/login
-type AuthResponseBody struct {
+type AuthResponse struct {
 	Token string
 }
 

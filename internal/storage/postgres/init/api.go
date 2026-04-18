@@ -23,16 +23,16 @@ CREATE TABLE items(
 
 CREATE TABLE user_inventories(
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id),
-    item_id INT NOT NULL REFERENCES items(id),
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id INT NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
     quantity INT NOT NULL CHECK ( quantity > 0 ) DEFAULT 1,
     UNIQUE (user_id, item_id)
 );
 
 CREATE TABLE transactions(
     id BIGSERIAL PRIMARY KEY,
-    from_user_id BIGINT NOT NULL REFERENCES users(id),
-    to_user_id BIGINT NOT NULL REFERENCES users(id),
+    from_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE NO ACTION,
+    to_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE NO ACTION,
     amount INT NOT NULL CHECK ( amount > 0 )
 );
 
