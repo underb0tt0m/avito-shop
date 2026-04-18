@@ -7,8 +7,10 @@ import (
 	"avito-shop/internal/storage"
 	"avito-shop/internal/tools"
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -34,32 +36,23 @@ func (s auth) Auth(ctx context.Context, data dto.UserData) (dto.AuthResponseBody
 		return dto.AuthResponseBody{}, err
 	}
 
-	DBHashedPassword, isNew, err := s.Storage.GetHashedUserPassword(ctx, hashedUser.Name)
-	DBHashedPassword = hashedUser.Password //TODO убрать после добавления репозитория с паролями
+	DBHashedPassword, err := s.Storage.GetHashedUserPassword(ctx, hashedUser.Name)
 	switch {
-	case isNew:
-		//TODO создание пользователя в БД
-		s.Logger.Info(
-			fmt.Sprintf(
-				"new user created: %v",
-				hashedUser.Name,
-			),
-		)
-	case err != nil:
-		// TODO Логика с типом ошибок
-		switch {
-		case false:
-		default:
-			s.Logger.Error(
-				fmt.Sprintf(
-					"failed to get user password from Storage, username: %v",
-					hashedUser.Name,
-				),
+	case errors.Is(err, pgx.ErrNoRows):
+		DBHashedPassword, err = s.Storage.CreateUser(ctx, hashedUser)
+		if err != nil {
+			return dto.AuthResponseBody{}, fmt.Errorf(
+				"failed to create new user: %v",
 				err,
 			)
 		}
+		s.Logger.Info("create new user")
+	case err != nil:
+		return dto.AuthResponseBody{}, fmt.Errorf(
+			"failed to get user password from Storage: %v",
+			err,
+		)
 
-		return dto.AuthResponseBody{}, err
 	}
 
 	if err = bcrypt.CompareHashAndPassword(
