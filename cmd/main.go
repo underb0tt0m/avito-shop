@@ -2,6 +2,7 @@ package main
 
 import (
 	"avito-shop/cmd/handler"
+	"avito-shop/internal/api_middleware"
 	"avito-shop/internal/config"
 	"avito-shop/internal/logging/logger_factory"
 	"avito-shop/internal/service"
@@ -67,7 +68,11 @@ func main() {
 	router := chi.NewRouter()
 
 	router.Route("/api", func(r chi.Router) {
-		handler.Main(serviceAPI, r, logger)
+		r.Use(api_middleware.Stopwatch(logger))
+		r.Group(func(r chi.Router) {
+			r.Use(api_middleware.Auth(logger))
+			handler.Main(serviceAPI, r, logger)
+		})
 		handler.Auth(serviceAuth, r, logger)
 	})
 
