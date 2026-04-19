@@ -5,28 +5,18 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
+	"avito-shop/internal/tools"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
 func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 	r.Post("/auth", func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		logger.Debug(
-			fmt.Sprintf(
-				"request received, method: %v, pattern: %v, remoteAddr: %v",
-				r.Method,
-				r.Pattern,
-				r.RemoteAddr,
-			),
-		)
-
 		requestBody, err := io.ReadAll(r.Body)
 		defer func() { _ = r.Body.Close() }()
 		if err != nil {
@@ -34,7 +24,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to read auth request body",
 				err,
 			)
-			WriteError(w, err)
+			tools.WriteError(w, err)
 			return
 		}
 
@@ -47,7 +37,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to unmarshal auth request body",
 				err,
 			)
-			WriteError(w, err)
+			tools.WriteError(w, err)
 			return
 		}
 
@@ -68,7 +58,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				),
 				err,
 			)
-			WriteError(w, err)
+			tools.WriteError(w, err)
 			return
 		}
 
@@ -78,7 +68,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to marshal auth response body",
 				err,
 			)
-			WriteError(w, err)
+			tools.WriteError(w, err)
 			return
 		}
 
@@ -87,16 +77,8 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to write auth response",
 				err,
 			)
-			WriteError(w, err)
+			tools.WriteError(w, err)
 			return
 		}
-
-		logger.Debug(
-			fmt.Sprintf(
-				"request has been processed, status: %v, processing time: %v",
-				http.StatusOK,
-				time.Since(start),
-			),
-		)
 	})
 }

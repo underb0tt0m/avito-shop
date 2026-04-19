@@ -1,11 +1,11 @@
 server_type: "development"           # TODO
-port: "8080"
+port: "8080" # при смене изменить docker-compose.yaml
 
 storage:
   type: "postgresql"                 # TODO
   connection:
     driver: "postgres"
-    host: "localhost"
+    host: "db" # при запуске в docker-compose необходимо название контейнера БД
     port: "5432"
     database: "avito_shop"
   query_timeout: "1s"
