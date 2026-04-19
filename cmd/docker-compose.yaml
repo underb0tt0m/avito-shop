@@ -1,0 +1,49 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: cmd/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../logs:/root/logs
+      - ../.env:/root/.env
+      - ./config.yaml:/root/config.yaml
+    depends_on:
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: avito_shop
+    ports:
+      - "5431:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/18/docker
+
+  migrations:
+    image: migrate/migrate:v4.19.1
+    command:
+      - "-path"
+      - "/migrations"
+      - "-database"
+      - "postgresql://postgres:postgres@db:5432/avito_shop?sslmode=disable"
+      - "up"
+    volumes:
+      - ../internal/storage/postgres/migrations:/migrations
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

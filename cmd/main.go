@@ -25,7 +25,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := config.Init("cmd/config.yaml"); err != nil {
+	if err := config.Init("config.yaml"); err != nil {
 		panic(err)
 	}
 
