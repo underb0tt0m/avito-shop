@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Auth interface {
@@ -19,21 +18,29 @@ type Auth interface {
 }
 
 type auth struct {
-	Storage storage.Auth
-	Logger  logging.Logger
+	Storage    storage.Auth
+	Logger     logging.Logger
+	TokenMaker tools.TokenMaker
+	Hasher     tools.Hasher
 }
 
-func NewAuth(s storage.Auth, l logging.Logger) Auth {
+func NewAuth(s storage.Auth, l logging.Logger, t tools.TokenMaker, h tools.Hasher) Auth {
 	return auth{
-		Storage: s,
-		Logger:  l,
+		Storage:    s,
+		Logger:     l,
+		TokenMaker: t,
+		Hasher:     h,
 	}
 }
 
 func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse, error) {
-	hashedUser, err := domain.NewHashed(data.Name, data.Password, s.Logger)
+	hashedPassword, err := s.Hasher.Hash(data.Password, s.Logger)
 	if err != nil {
 		return dto.AuthResponse{}, err
+	}
+	hashedUser := domain.HashedUserData{
+		Name:     data.Name,
+		Password: hashedPassword,
 	}
 
 	DBHashedPassword, err := s.Storage.GetHashedUserPassword(ctx, hashedUser.Name)
@@ -55,7 +62,7 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 
 	}
 
-	if err = bcrypt.CompareHashAndPassword(
+	if err = s.Hasher.CompareHashAndPassword(
 		DBHashedPassword,
 		[]byte(data.Password),
 	); err != nil {
@@ -71,7 +78,7 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 	}
 
 	userClaims := domain.DefaultUser{UserName: hashedUser.Name}
-	token, err := tools.CreateToken(userClaims, s.Logger)
+	token, err := s.TokenMaker.CreateToken(userClaims, s.Logger)
 	if err != nil {
 		return dto.AuthResponse{}, err
 	}

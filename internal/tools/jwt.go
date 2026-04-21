@@ -11,7 +11,19 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func CreateToken(data any, logger logging.Logger) (string, error) {
+type TokenMaker interface {
+	CreateToken(data any, logger logging.Logger) (string, error)
+	ValidateUserToken(tokenString string, logger logging.Logger) error
+	ParseUserTokenRaw(tokenString string, logger logging.Logger) ([]byte, error)
+}
+
+type jwtTokenMaker struct{}
+
+func NewToken() TokenMaker {
+	return jwtTokenMaker{}
+}
+
+func (t jwtTokenMaker) CreateToken(data any, logger logging.Logger) (string, error) {
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
 		logger.Error(
@@ -49,7 +61,7 @@ func CreateToken(data any, logger logging.Logger) (string, error) {
 	return tokenString, nil
 }
 
-func ValidateUserToken(tokenString string, logger logging.Logger) error {
+func (t jwtTokenMaker) ValidateUserToken(tokenString string, logger logging.Logger) error {
 	_, err := jwt.Parse(tokenString, createKeyFunc(logger))
 	if err != nil {
 		logger.Error(
@@ -61,7 +73,7 @@ func ValidateUserToken(tokenString string, logger logging.Logger) error {
 	return nil
 }
 
-func ParseUserTokenRaw(tokenString string, logger logging.Logger) ([]byte, error) {
+func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string, logger logging.Logger) ([]byte, error) {
 	token, err := jwt.Parse(tokenString, createKeyFunc(logger))
 	if err != nil {
 		logger.Warn(

@@ -25,7 +25,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := config.Init("config.yaml"); err != nil {
+	if err := config.Init("cmd/config.yaml"); err != nil {
 		panic(err)
 	}
 
@@ -50,12 +50,14 @@ func main() {
 			err,
 		)
 	}
+	tokenMaker := tools.NewToken()
+	hasher := tools.NewHasher()
 
 	storageAPI := postgres.NewStorageAPI(conn, logger)
 	serviceAPI := service.NewApi(storageAPI, logger)
 
 	storageAuth := postgres.NewStorageAuth(conn, logger)
-	serviceAuth := service.NewAuth(storageAuth, logger)
+	serviceAuth := service.NewAuth(storageAuth, logger, tokenMaker, hasher)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
@@ -70,7 +72,7 @@ func main() {
 	router.Route("/api", func(r chi.Router) {
 		r.Use(api_middleware.Stopwatch(logger))
 		r.Group(func(r chi.Router) {
-			r.Use(api_middleware.Auth(logger))
+			r.Use(api_middleware.Auth(logger, tokenMaker))
 			handler.Main(serviceAPI, r, logger)
 		})
 		handler.Auth(serviceAuth, r, logger)
