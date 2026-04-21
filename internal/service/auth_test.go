@@ -22,7 +22,7 @@ func TestAuth(t *testing.T) {
 		mockStorage     storage.Auth
 		tokenMaker      tools.TokenMaker
 		hasher          tools.Hasher
-		expectedAns     dto.AuthResponse
+		expected        dto.AuthResponse
 		wantErr         bool
 		wantSpecificErr error
 	}{
@@ -130,8 +130,8 @@ func TestAuth(t *testing.T) {
 			}
 		}
 
-		if result != test.expectedAns {
-			t.Errorf("Test %v, Auth() = %+v, want %+v", test.name, result, test.expectedAns)
+		if result != test.expected {
+			t.Errorf("Test %v, Auth() = %+v, want %+v", test.name, result, test.expected)
 		} else {
 			t.Logf("Test %v, Auth() success: %+v", test.name, result)
 		}

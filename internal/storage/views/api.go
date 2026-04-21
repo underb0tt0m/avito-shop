@@ -1,7 +1,6 @@
 package views
 
 type UserInventory struct {
-	Balance  int
 	ItemName string
 	Quantity int
 }
