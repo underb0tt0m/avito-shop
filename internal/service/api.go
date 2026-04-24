@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+//go:generate mockgen -source=api.go -destination=../mocks/service_api.go -package=mocks -mock_names=API=MockServiceAPI
 type API interface {
 	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
 	SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error
@@ -48,9 +49,6 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 
 	var userInventory []domain.Item
 	for _, item := range userInventories {
-		if item.ItemName == "" {
-			break
-		}
 		userInventory = append(userInventory, domain.Item{
 			ObjType:  item.ItemName,
 			Quantity: item.Quantity,

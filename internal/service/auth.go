@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+//go:generate mockgen -source=auth.go -destination=../mocks/service_auth.go -package=mocks -mock_names=Auth=MockServiceAuth
 type Auth interface {
 	Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse, error)
 }
@@ -78,7 +79,7 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 	}
 
 	userClaims := domain.DefaultUser{UserName: hashedUser.Name}
-	token, err := s.TokenMaker.CreateToken(userClaims, s.Logger)
+	token, err := s.TokenMaker.CreateToken(userClaims)
 	if err != nil {
 		return dto.AuthResponse{}, err
 	}

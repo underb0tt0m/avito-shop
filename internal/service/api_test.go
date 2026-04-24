@@ -26,10 +26,75 @@ func TestGetUserInfo(t *testing.T) {
 	}{
 		{
 			"success_get_user_info",
-			mocks.NewStorageAPI(nil, nil, nil),
+			mocks.NewStorageAPI(
+				func(ctx context.Context, username string) (
+					int,
+					[]views.UserInventory,
+					[]views.UserTransaction,
+					error,
+				) {
+					return 100,
+						[]views.UserInventory{{"test", 1}},
+						[]views.UserTransaction{
+							{
+								"friend",
+								"test",
+								10,
+							},
+							{
+								"test",
+								"friend",
+								10,
+							},
+						},
+						nil
+				},
+				nil,
+				nil,
+			),
 			"test",
 			&dto.InfoResponse{
-				Coins:     0,
+				Coins: 100,
+				Inventory: []dto.Item{
+					{
+						"test",
+						1,
+					},
+				},
+				CoinHistory: dto.History{
+					Received: []dto.ReceivedTransaction{
+						{
+							"friend",
+							10,
+						},
+					},
+					Sent: []dto.SentTransaction{
+						{
+							"friend",
+							10,
+						},
+					},
+				},
+			},
+			false,
+			nil,
+		},
+
+		{
+			"success_user_with_empty_inventory",
+			mocks.NewStorageAPI(
+				func(ctx context.Context, username string) (
+					int,
+					[]views.UserInventory,
+					[]views.UserTransaction, error) {
+					return 100, nil, nil, nil
+				},
+				nil,
+				nil,
+			),
+			"test",
+			&dto.InfoResponse{
+				Coins:     100,
 				Inventory: []dto.Item{},
 				CoinHistory: dto.History{
 					Received: []dto.ReceivedTransaction{},
@@ -43,7 +108,10 @@ func TestGetUserInfo(t *testing.T) {
 		{
 			"error_missing_user",
 			mocks.NewStorageAPI(
-				func(ctx context.Context, username string) (int, []views.UserInventory, []views.UserTransaction, error) {
+				func(ctx context.Context, username string) (
+					int,
+					[]views.UserInventory,
+					[]views.UserTransaction, error) {
 					return 0, nil, nil, pgx.ErrNoRows
 				},
 				nil,

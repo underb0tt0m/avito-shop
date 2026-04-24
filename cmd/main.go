@@ -50,7 +50,7 @@ func main() {
 			err,
 		)
 	}
-	tokenMaker := tools.NewToken()
+	tokenMaker := tools.NewToken(logger)
 	hasher := tools.NewHasher()
 
 	storageAPI := postgres.NewStorageAPI(conn, logger)

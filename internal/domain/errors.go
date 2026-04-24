@@ -42,4 +42,8 @@ var (
 		Code:    402,
 		Message: "insufficient coins balance",
 	}
+	ErrUnprocessableEntity = APIErr{
+		Code:    422,
+		Message: "invalid request body",
+	}
 )

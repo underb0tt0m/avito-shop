@@ -76,7 +76,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 				"failed to unmarshal request body",
 				err,
 			)
-			tools.WriteError(w, err)
+			tools.WriteError(w, domain.ErrUnprocessableEntity)
 			return
 		}
 

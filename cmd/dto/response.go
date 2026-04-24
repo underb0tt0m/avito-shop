@@ -1,6 +1,8 @@
 package dto
 
 // DTO успешного ответа на GET /api/info
+type Response interface{}
+
 type InfoResponse struct {
 	Coins       int     `json:"coins"` // Количество доступных монет
 	Inventory   []Item  `json:"inventory"`

@@ -94,5 +94,7 @@ func TestHash(t *testing.T) {
 		if err == nil && test.wantErr {
 			t.Fatalf("Test %v, Hash() unhandled error: %v", test.name, err)
 		}
+
+		t.Logf("Test %v, BuyItem() success", test.name)
 	}
 }

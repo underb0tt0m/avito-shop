@@ -55,7 +55,7 @@ func Auth(logger logging.Logger, tokenMaker tools.TokenMaker) func(handler http.
 				return
 			}
 			token = strings.TrimSpace(token)
-			jsonBytes, err := tokenMaker.ParseUserTokenRaw(token, logger)
+			jsonBytes, err := tokenMaker.ParseUserTokenRaw(token)
 			if err != nil {
 				tools.WriteError(w, err)
 				return

@@ -90,12 +90,46 @@ func TestAuth(t *testing.T) {
 			dto.AuthRequest{Name: "test", Password: "test"},
 			mocks.NewStorageAuth(nil, nil),
 			mocks.NewToken(
-				func(data any, logger logging.Logger) (string, error) {
+				func(data any) (string, error) {
 					return "", errors.New("test")
 				},
 				nil,
 				nil,
 			),
+			mocks.NewHasher(nil, nil),
+			dto.AuthResponse{},
+			true,
+			nil,
+		},
+
+		{
+			"error_failed_to_hash_password",
+			dto.AuthRequest{Name: "test", Password: "test"},
+			mocks.NewStorageAuth(nil, nil),
+			mocks.NewToken(nil, nil, nil),
+			mocks.NewHasher(
+				func(data string, logger logging.Logger) ([]byte, error) {
+					return []byte{}, domain.ErrInternalServerError
+				},
+				nil,
+			),
+			dto.AuthResponse{},
+			true,
+			domain.ErrInternalServerError,
+		},
+
+		{
+			"error_failed_to_create_user",
+			dto.AuthRequest{Name: "test", Password: "test"},
+			mocks.NewStorageAuth(
+				func(ctx context.Context, username string) ([]byte, error) {
+					return nil, pgx.ErrNoRows
+				},
+				func(ctx context.Context, user domain.HashedUserData) ([]byte, error) {
+					return nil, errors.New("test")
+				},
+			),
+			mocks.NewToken(nil, nil, nil),
 			mocks.NewHasher(nil, nil),
 			dto.AuthResponse{},
 			true,
