@@ -3,6 +3,7 @@ package handler
 import (
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/config"
+	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
 	"avito-shop/internal/tools"
@@ -37,7 +38,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 				"failed to unmarshal auth request body",
 				err,
 			)
-			tools.WriteError(w, err)
+			tools.WriteError(w, domain.ErrUnprocessableEntity)
 			return
 		}
 

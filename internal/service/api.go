@@ -6,8 +6,12 @@ import (
 	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
 	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
 )
 
+//go:generate mockgen -source=api.go -destination=../mocks/service_api.go -package=mocks -mock_names=API=MockServiceAPI
 type API interface {
 	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
 	SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error
@@ -26,8 +30,15 @@ func NewApi(s storage.API, l logging.Logger) API {
 }
 
 func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error) {
-	userInventories, userTransactions, err := s.Storage.GetUserInfo(ctx, username)
+	userBalance, userInventories, userTransactions, err := s.Storage.GetUserInfo(ctx, username)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.Logger.Error(
+				"user is missing from the database",
+				err,
+			)
+			return nil, domain.ErrNotFound
+		}
 		s.Logger.Error(
 			"failed to get user info from mainRoutRepository",
 			err,
@@ -36,14 +47,8 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 	}
 	s.Logger.Debug("received data from mainRoutRepository")
 
-	userBalance := userInventories[0].Balance
-	s.Logger.Debug("user balance extracted")
-
 	var userInventory []domain.Item
 	for _, item := range userInventories {
-		if item.ItemName == "" {
-			break
-		}
 		userInventory = append(userInventory, domain.Item{
 			ObjType:  item.ItemName,
 			Quantity: item.Quantity,

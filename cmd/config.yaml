@@ -5,7 +5,7 @@ storage:
   type: "postgresql"                 # TODO
   connection:
     driver: "postgres"
-    host: "db" # при запуске в docker-compose необходимо название контейнера БД
+    host: "localhost" # при запуске в docker-compose необходимо название контейнера БД
     port: "5432"
     database: "avito_shop"
   query_timeout: "1s"

@@ -33,7 +33,7 @@ func Stopwatch(logger logging.Logger) func(handler http.Handler) http.Handler {
 	}
 }
 
-func Auth(logger logging.Logger) func(handler http.Handler) http.Handler {
+func Auth(logger logging.Logger, tokenMaker tools.TokenMaker) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
@@ -55,7 +55,7 @@ func Auth(logger logging.Logger) func(handler http.Handler) http.Handler {
 				return
 			}
 			token = strings.TrimSpace(token)
-			jsonBytes, err := tools.ParseUserTokenRaw(token, logger)
+			jsonBytes, err := tokenMaker.ParseUserTokenRaw(token)
 			if err != nil {
 				tools.WriteError(w, err)
 				return

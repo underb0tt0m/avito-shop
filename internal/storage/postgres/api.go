@@ -24,7 +24,7 @@ func NewStorageAPI(conn *pgx.Conn, logger logging.Logger) storage.API {
 	}
 }
 
-func (s storageAPI) GetUserInfo(ctx context.Context, username string) ([]views.UserInventory, []views.UserTransaction, error) {
+func (s storageAPI) GetUserInfo(ctx context.Context, username string) (int, []views.UserInventory, []views.UserTransaction, error) {
 	userInfoStmt := `
 SELECT
 	a.balance,
@@ -41,9 +41,10 @@ WHERE a.name=$1
 			"failed to query user inventory",
 			err,
 		)
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
 
+	userBalance := -1
 	var (
 		balance, quantity *int
 		itemName          *string
@@ -60,19 +61,20 @@ WHERE a.name=$1
 				"failed to scan user inventory row",
 				err,
 			)
-			return nil, nil, err
+			return 0, nil, nil, err
+		}
+		if userBalance == -1 {
+			userBalance = *balance
 		}
 		if itemName != nil {
 			userInventories = append(userInventories, views.UserInventory{
-				Balance:  *balance,
 				ItemName: *itemName,
 				Quantity: *quantity,
 			})
-		} else {
-			userInventories = append(userInventories, views.UserInventory{
-				Balance: *balance,
-			})
 		}
+	}
+	if userBalance == -1 {
+		return 0, nil, nil, pgx.ErrNoRows
 	}
 
 	userTransactionsInfoStmt := `
@@ -100,7 +102,7 @@ WHERE b.name=$1 OR c.name=$1
 			"failed to query user transactions",
 			err,
 		)
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -113,7 +115,7 @@ WHERE b.name=$1 OR c.name=$1
 				"failed to scan user transaction row",
 				err,
 			)
-			return nil, nil, err
+			return 0, nil, nil, err
 		}
 		userTransactions = append(userTransactions, views.UserTransaction{
 			FromUser: fromUser,
@@ -121,7 +123,7 @@ WHERE b.name=$1 OR c.name=$1
 			Amount:   amount,
 		})
 	}
-	return userInventories, userTransactions, nil
+	return userBalance, userInventories, userTransactions, nil
 }
 
 func (s storageAPI) SendCoins(ctx context.Context, fromUser string, transaction domain.SentTransaction) error {

@@ -11,10 +11,24 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func CreateToken(data any, logger logging.Logger) (string, error) {
+type TokenMaker interface {
+	CreateToken(data any) (string, error)
+	ValidateUserToken(tokenString string) error
+	ParseUserTokenRaw(tokenString string) ([]byte, error)
+}
+
+type jwtTokenMaker struct {
+	logger logging.Logger
+}
+
+func NewToken(logger logging.Logger) TokenMaker {
+	return jwtTokenMaker{logger}
+}
+
+func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
-		logger.Error(
+		t.logger.Error(
 			"failed to marshal token data",
 			err,
 		)
@@ -26,7 +40,7 @@ func CreateToken(data any, logger logging.Logger) (string, error) {
 		jsonBytes,
 		&mapClaims,
 	); err != nil {
-		logger.Error(
+		t.logger.Error(
 			"failed to unmarshal token data",
 			err,
 		)
@@ -40,7 +54,7 @@ func CreateToken(data any, logger logging.Logger) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mapClaims)
 	tokenString, err := token.SignedString(config.App.Security.JWTToken.SecretKey)
 	if err != nil {
-		logger.Error(
+		t.logger.Error(
 			"failed to sign token",
 			err,
 		)
@@ -49,29 +63,29 @@ func CreateToken(data any, logger logging.Logger) (string, error) {
 	return tokenString, nil
 }
 
-func ValidateUserToken(tokenString string, logger logging.Logger) error {
-	_, err := jwt.Parse(tokenString, createKeyFunc(logger))
+func (t jwtTokenMaker) ValidateUserToken(tokenString string) error {
+	_, err := jwt.Parse(tokenString, createKeyFunc(t.logger))
 	if err != nil {
-		logger.Error(
+		t.logger.Error(
 			"invalid token",
 			domain.ErrInvalidToken,
 		)
-		return err
+		return domain.ErrInvalidToken
 	}
 	return nil
 }
 
-func ParseUserTokenRaw(tokenString string, logger logging.Logger) ([]byte, error) {
-	token, err := jwt.Parse(tokenString, createKeyFunc(logger))
+func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string) ([]byte, error) {
+	token, err := jwt.Parse(tokenString, createKeyFunc(t.logger))
 	if err != nil {
-		logger.Warn(
+		t.logger.Warn(
 			"invalid token",
 			domain.ErrInvalidToken,
 		)
 		return nil, domain.ErrInvalidToken
 	}
 	if !token.Valid {
-		logger.Warn(
+		t.logger.Warn(
 			"invalid token",
 			domain.ErrInvalidToken,
 		)
@@ -80,7 +94,7 @@ func ParseUserTokenRaw(tokenString string, logger logging.Logger) ([]byte, error
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		logger.Warn(
+		t.logger.Warn(
 			"invalid token",
 			domain.ErrInvalidToken,
 		)
