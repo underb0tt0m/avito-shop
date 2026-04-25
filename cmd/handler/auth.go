@@ -8,7 +8,6 @@ import (
 	"avito-shop/internal/service"
 	"avito-shop/internal/tools"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
+func Auth(s service.Auth, r chi.Router, logger logging.Logger, jsonCodec tools.JSONCodec) {
 	r.Post("/auth", func(w http.ResponseWriter, r *http.Request) {
 		requestBody, err := io.ReadAll(r.Body)
 		defer func() { _ = r.Body.Close() }()
@@ -30,7 +29,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 		}
 
 		user := dto.AuthRequest{}
-		if err = json.Unmarshal(
+		if err = jsonCodec.Unmarshal(
 			requestBody,
 			&user,
 		); err != nil {
@@ -63,7 +62,7 @@ func Auth(s service.Auth, r chi.Router, logger logging.Logger) {
 			return
 		}
 
-		responseBody, err := json.Marshal(token)
+		responseBody, err := jsonCodec.Marshal(token)
 		if err != nil {
 			logger.Error(
 				"failed to marshal auth response body",

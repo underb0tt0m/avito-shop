@@ -12,6 +12,7 @@ type Config struct {
 	Port       string   `yaml:"port"`
 	Storage    Storage  `yaml:"storage"`
 	Logger     Logger   `yaml:"logger"`
+	Tools      Tools    `yaml:"tools"`
 	Security   Security `yaml:"security"`
 }
 
@@ -31,6 +32,10 @@ type Connection struct {
 type Logger struct {
 	Type  string `yaml:"type"`
 	Level string `yaml:"level"`
+}
+
+type Tools struct {
+	JSON string `yaml:"json"`
 }
 
 type Security struct {

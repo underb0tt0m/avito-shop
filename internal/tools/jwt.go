@@ -4,7 +4,6 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -18,15 +17,16 @@ type TokenMaker interface {
 }
 
 type jwtTokenMaker struct {
-	logger logging.Logger
+	logger    logging.Logger
+	jsonCodec JSONCodec
 }
 
-func NewToken(logger logging.Logger) TokenMaker {
-	return jwtTokenMaker{logger}
+func NewToken(logger logging.Logger, jsonCodec JSONCodec) TokenMaker {
+	return jwtTokenMaker{logger, jsonCodec}
 }
 
 func (t jwtTokenMaker) CreateToken(data any) (string, error) {
-	jsonBytes, err := json.Marshal(data)
+	jsonBytes, err := t.jsonCodec.Marshal(data)
 	if err != nil {
 		t.logger.Error(
 			"failed to marshal token data",
@@ -36,7 +36,7 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	}
 
 	var mapClaims jwt.MapClaims
-	if err = json.Unmarshal(
+	if err = t.jsonCodec.Unmarshal(
 		jsonBytes,
 		&mapClaims,
 	); err != nil {
@@ -100,7 +100,7 @@ func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string) ([]byte, error) {
 		)
 		return nil, domain.ErrInvalidToken
 	}
-	return json.Marshal(claims)
+	return t.jsonCodec.Marshal(claims)
 }
 
 func createKeyFunc(logger logging.Logger) jwt.Keyfunc {

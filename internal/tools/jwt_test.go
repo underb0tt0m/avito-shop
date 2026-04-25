@@ -26,7 +26,8 @@ func TestCreateToken(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 	logger := testLogger{}
-	tokenMaker := NewToken(logger)
+	jsonCodec := NewJSONCodec()
+	tokenMaker := NewToken(logger, jsonCodec)
 
 	for _, test := range tests {
 		_, err := tokenMaker.CreateToken(test.data)
@@ -74,7 +75,8 @@ func TestValidateUserToken(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 	logger := testLogger{}
-	tokenMaker := NewToken(logger)
+	jsonCodec := NewJSONCodec()
+	tokenMaker := NewToken(logger, jsonCodec)
 
 	invalidToken := "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzcwMjI0MzYsImlhdCI6MTc3NjkzNjAzNiwiaXNzIjoiYXBwIiwidXNlcm5hbWUiOiJ0ZXN0In0.HIRPan281i1plIzfaUl00uyvBsXM2u5FkCNWIp2nXVg"
 	validToken, err := tokenMaker.CreateToken(domain.DefaultUser{UserName: "test"})
@@ -134,7 +136,8 @@ func TestParseUserTokenRaw(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 	logger := testLogger{}
-	tokenMaker := NewToken(logger)
+	jsonCodec := NewJSONCodec()
+	tokenMaker := NewToken(logger, jsonCodec)
 
 	invalidToken := "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzcwMjI0MzYsImlhdCI6MTc3NjkzNjAzNiwiaXNzIjoiYXBwIiwidXNlcm5hbWUiOiJ0ZXN0In0.HIRPan281i1plIzfaUl00uyvBsXM2u5FkCNWIp2nXVg"
 	validToken, err := tokenMaker.CreateToken(domain.DefaultUser{UserName: "test"})

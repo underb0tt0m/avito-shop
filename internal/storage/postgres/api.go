@@ -10,14 +10,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type storageAPI struct {
-	Conn   *pgx.Conn
+	Conn   *pgxpool.Pool
 	Logger logging.Logger
 }
 
-func NewStorageAPI(conn *pgx.Conn, logger logging.Logger) storage.API {
+func NewStorageAPI(conn *pgxpool.Pool, logger logging.Logger) storage.API {
 	return storageAPI{
 		Conn:   conn,
 		Logger: logger,
