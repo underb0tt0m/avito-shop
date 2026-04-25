@@ -6,15 +6,15 @@ import (
 	"avito-shop/internal/storage"
 	"context"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type storageAuth struct {
-	Conn   *pgx.Conn
+	Conn   *pgxpool.Pool
 	Logger logging.Logger
 }
 
-func NewStorageAuth(conn *pgx.Conn, logger logging.Logger) storage.Auth {
+func NewStorageAuth(conn *pgxpool.Pool, logger logging.Logger) storage.Auth {
 	return storageAuth{
 		Conn:   conn,
 		Logger: logger,

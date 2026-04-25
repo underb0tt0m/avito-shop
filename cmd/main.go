@@ -50,7 +50,8 @@ func main() {
 			err,
 		)
 	}
-	tokenMaker := tools.NewToken(logger)
+	jsonCodec := tools.NewJSONCodec()
+	tokenMaker := tools.NewToken(logger, jsonCodec)
 	hasher := tools.NewHasher()
 
 	storageAPI := postgres.NewStorageAPI(conn, logger)
@@ -73,9 +74,9 @@ func main() {
 		r.Use(api_middleware.Stopwatch(logger))
 		r.Group(func(r chi.Router) {
 			r.Use(api_middleware.Auth(logger, tokenMaker))
-			handler.Main(serviceAPI, r, logger)
+			handler.Main(serviceAPI, r, logger, jsonCodec)
 		})
-		handler.Auth(serviceAuth, r, logger)
+		handler.Auth(serviceAuth, r, logger, jsonCodec)
 	})
 
 	server := http.Server{

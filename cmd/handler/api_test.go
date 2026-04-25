@@ -5,6 +5,7 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/mocks"
+	"avito-shop/internal/tools"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -25,6 +26,7 @@ func TestInfo(t *testing.T) {
 	token := "Bearer test"
 	logger := mocks.NewLogger(nil)
 	tokenMaker := mocks.NewToken(nil, nil, nil)
+	jsonCodec := tools.NewJSONCodec()
 
 	tests := []struct {
 		name           string
@@ -78,7 +80,7 @@ func TestInfo(t *testing.T) {
 			router := chi.NewRouter()
 			router.Route("/api", func(r chi.Router) {
 				r.Use(mocks.Auth(logger, tokenMaker))
-				Main(serviceAPI, r, logger)
+				Main(serviceAPI, r, logger, jsonCodec)
 			})
 
 			router.ServeHTTP(rr, req)
@@ -120,6 +122,7 @@ func TestSendCoin(t *testing.T) {
 	token := "Bearer test"
 	logger := mocks.NewLogger(nil)
 	tokenMaker := mocks.NewToken(nil, nil, nil)
+	jsonCodec := tools.NewJSONCodec()
 
 	tests := []struct {
 		name           string
@@ -195,7 +198,7 @@ func TestSendCoin(t *testing.T) {
 			router := chi.NewRouter()
 			router.Route("/api", func(r chi.Router) {
 				r.Use(mocks.Auth(logger, tokenMaker))
-				Main(serviceAPI, r, logger)
+				Main(serviceAPI, r, logger, jsonCodec)
 			})
 
 			router.ServeHTTP(rr, req)
@@ -235,6 +238,7 @@ func TestBuyItem(t *testing.T) {
 	token := "Bearer token"
 	logger := mocks.NewLogger(nil)
 	tokenMaker := mocks.NewToken(nil, nil, nil)
+	jsonCodec := tools.NewJSONCodec()
 
 	tests := []struct {
 		name           string
@@ -314,7 +318,7 @@ func TestBuyItem(t *testing.T) {
 			router := chi.NewRouter()
 			router.Route("/api", func(r chi.Router) {
 				r.Use(mocks.Auth(logger, tokenMaker))
-				Main(serviceAPI, r, logger)
+				Main(serviceAPI, r, logger, jsonCodec)
 			})
 
 			router.ServeHTTP(rr, req)

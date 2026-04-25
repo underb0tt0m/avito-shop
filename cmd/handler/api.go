@@ -8,7 +8,6 @@ import (
 	"avito-shop/internal/service"
 	"avito-shop/internal/tools"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -16,7 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Main(s service.API, r chi.Router, logger logging.Logger) {
+func Main(s service.API, r chi.Router, logger logging.Logger, jsonCodec tools.JSONCodec) {
 	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
 		user, err := tools.GetUserFromContext(r)
 		if err != nil {
@@ -36,7 +35,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 			return
 		}
 
-		response, err := json.MarshalIndent(dtoUser, "", "	")
+		response, err := jsonCodec.MarshalIndent(dtoUser, "", "	")
 		if err != nil {
 			logger.Error(
 				"failed to marshal user info response",
@@ -68,7 +67,7 @@ func Main(s service.API, r chi.Router, logger logging.Logger) {
 		}
 
 		transaction := dto.SendCoinRequest{}
-		if err = json.Unmarshal(
+		if err = jsonCodec.Unmarshal(
 			requestBody,
 			&transaction,
 		); err != nil {

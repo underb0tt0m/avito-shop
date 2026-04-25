@@ -5,6 +5,7 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/mocks"
+	"avito-shop/internal/tools"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -23,6 +24,7 @@ func TestAuth(t *testing.T) {
 	method := http.MethodPost
 	path := "/api/auth"
 	logger := mocks.NewLogger(nil)
+	jsonCodec := tools.NewJSONCodec()
 
 	tests := []struct {
 		name           string
@@ -88,7 +90,7 @@ func TestAuth(t *testing.T) {
 
 			router := chi.NewRouter()
 			router.Route("/api", func(r chi.Router) {
-				Auth(serviceAuth, r, logger)
+				Auth(serviceAuth, r, logger, jsonCodec)
 			})
 
 			router.ServeHTTP(rr, req)
