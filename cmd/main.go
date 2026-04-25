@@ -43,7 +43,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	conn, err := tools.Create(ctx)
+	conn, err := tools.CreatePool(ctx)
 	if err != nil {
 		logger.Fatal(
 			"can't connect db",
