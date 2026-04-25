@@ -18,6 +18,7 @@ type Config struct {
 
 type Storage struct {
 	Type         string        `yaml:"type"`
+	Version      string        `yaml:"version"`
 	Connection   Connection    `yaml:"connection"`
 	QueryTimeout time.Duration `yaml:"query_timeout"`
 }

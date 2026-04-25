@@ -2,7 +2,8 @@ server_type: "development"           # TODO
 port: "8080" # при смене изменить docker-compose.yaml
 
 storage:
-  type: "postgresql"                 # TODO
+  type: "postgres"                 # TODO
+  version: "18-alpine"
   connection:
     driver: "postgres"
     host: "localhost" # при запуске в docker-compose необходимо название контейнера БД

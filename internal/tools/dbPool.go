@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Create(ctx context.Context) (*pgxpool.Pool, error) {
+func CreatePool(ctx context.Context) (*pgxpool.Pool, error) {
 	connStr := fmt.Sprintf(
 		"%v://%v:%v@%v:%v/%v",
 		config.App.Storage.Connection.Driver,
