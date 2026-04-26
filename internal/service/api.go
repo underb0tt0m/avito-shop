@@ -1,14 +1,15 @@
 package service
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/storage"
 	"context"
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/storage"
 )
 
 //go:generate mockgen -source=api.go -destination=../mocks/service_api.go -package=mocks -mock_names=API=MockServiceAPI
@@ -17,6 +18,7 @@ type API interface {
 	SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error
 	BuyItem(ctx context.Context, itemID int, user string) error
 }
+
 type api struct {
 	Storage storage.API
 	Logger  logging.Logger
