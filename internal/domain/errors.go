@@ -1,5 +1,7 @@
 package domain
 
+import "net/http"
+
 type APIErr struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -10,8 +12,9 @@ func (e APIErr) Error() string {
 }
 
 var (
+	// тут нужно использовать готовые константы от хттп
 	ErrNotFound = APIErr{
-		Code:    404,
+		Code:    http.StatusNotFound,
 		Message: "user or item not found",
 	}
 	ErrBadRequest = APIErr{

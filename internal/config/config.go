@@ -54,6 +54,13 @@ type JWTToken struct {
 	Prefix    string        `yaml:"prefix"`
 }
 
+/*
+
+тут убрать глобальную переменную и Init, в main нужно вернуть структуру конфига приложения и пропихивать далее эти переменные
+при инициализации
+
+*/
+
 var App *Config
 
 func Init(path string) error {

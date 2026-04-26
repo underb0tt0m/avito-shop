@@ -1,33 +1,39 @@
 package main
 
 import (
-	"avito-shop/cmd/handler"
-	"avito-shop/internal/api_middleware"
-	"avito-shop/internal/config"
-	"avito-shop/internal/logging/logger_factory"
-	"avito-shop/internal/service"
-	"avito-shop/internal/storage/postgres"
-	"avito-shop/internal/tools"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"avito-shop/internal/logging/logger_factory"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"avito-shop/cmd/handler"
+	"avito-shop/internal/api_middleware"
+	"avito-shop/internal/config"
+	"avito-shop/internal/service"
+	"avito-shop/internal/storage/postgres"
+	"avito-shop/internal/tools"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-
 	if err := godotenv.Load(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	if err := config.Init("cmd/config.yaml"); err != nil {
 		panic(err)
 	}
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
 
 	logger, closeLogger, err := logger_factory.New()
 	if err != nil {
@@ -60,14 +66,6 @@ func main() {
 	storageAuth := postgres.NewStorageAuth(conn, logger)
 	serviceAuth := service.NewAuth(storageAuth, logger, tokenMaker, hasher)
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		<-signalChan
-		logger.Info("Got exit signal, exit context")
-		cancel()
-	}()
-
 	router := chi.NewRouter()
 
 	router.Route("/api", func(r chi.Router) {
@@ -81,7 +79,7 @@ func main() {
 
 	server := http.Server{
 		Addr:    fmt.Sprintf(":%v", config.App.Port),
-		Handler: router,
+		Handler: creaRoutes(),
 	}
 
 	go func() {
@@ -92,6 +90,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
+
 	if err = server.Shutdown(ctx); err != nil {
 		logger.Error(
 			"failed to shutdown server gracefully",
@@ -100,4 +99,42 @@ func main() {
 
 	}
 
+}
+
+func CreatePool(ctx context.Context) (*pgxpool.Pool, error) {
+	connStr := fmt.Sprintf(
+		"%v://%v:%v@%v:%v/%v",
+		config.App.Storage.Connection.Driver,
+		config.App.Storage.Connection.User,
+		config.App.Storage.Connection.Password,
+		config.App.Storage.Connection.Host,
+		config.App.Storage.Connection.Port,
+		config.App.Storage.Connection.Database,
+	)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+func creaRoutes() http.Handler {
+	router := chi.NewRouter()
+
+	router.Group(func(r chi.Router) {
+		r.Get("/info", h.Info)
+		r.Delete()
+	})
+
+	router.Route("/api", func(r chi.Router) {
+		r.Use(api_middleware.Stopwatch(logger))
+		r.Group(func(r chi.Router) {
+			r.Use(api_middleware.Auth(logger, tokenMaker))
+			handler.Main(serviceAPI, r, logger, jsonCodec)
+		})
+		handler.Auth(serviceAuth, r, logger, jsonCodec)
+	})
+
+	return router
 }

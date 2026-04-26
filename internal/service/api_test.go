@@ -1,16 +1,18 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/mocks"
 	"avito-shop/internal/storage"
 	"avito-shop/internal/storage/views"
-	"context"
-	"errors"
-	"reflect"
-	"testing"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -24,6 +26,7 @@ func TestGetUserInfo(t *testing.T) {
 		wantErr         bool
 		wantSpecificErr error
 	}{
+		// везде должны быть имена полей
 		{
 			"success_get_user_info",
 			mocks.NewStorageAPI(
@@ -163,7 +166,7 @@ func TestGetUserInfo(t *testing.T) {
 			}
 		}
 
-		if !reflect.DeepEqual(result, test.expected) {
+		if !assert.Equal(result, test.expected) {
 			t.Errorf("Test %v, GetUserInfo() = %+v, want %+v", test.name, result, test.expected)
 		} else {
 			t.Logf("Test %v, GetUserInfo() success: %+v", test.name, result)
