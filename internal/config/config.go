@@ -54,17 +54,6 @@ type JWTToken struct {
 	Prefix    string        `yaml:"prefix"`
 }
 
-var App *Config
-
-func Init(path string) error {
-	cfg, err := Load(path)
-	if err != nil {
-		return err
-	}
-	App = cfg
-	return nil
-}
-
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

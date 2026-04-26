@@ -1,7 +1,6 @@
 package zap_logging
 
 import (
-	"avito-shop/internal/config"
 	"avito-shop/internal/logging"
 	"fmt"
 	"os"
@@ -52,7 +51,7 @@ func (l logger) Sync() error {
 	return nil
 }
 
-func New() (logging.Logger, func() error, error) {
+func New(serverType string, logLvl string) (logging.Logger, func() error, error) {
 	if err := os.MkdirAll("logs", 755); err != nil {
 		return nil, nil, err
 	}
@@ -65,7 +64,7 @@ func New() (logging.Logger, func() error, error) {
 	}
 
 	var encoderCfg zapcore.EncoderConfig
-	switch config.App.ServerType {
+	switch serverType {
 	case "development":
 		encoderCfg = zap.NewDevelopmentEncoderConfig()
 	case "production":
@@ -79,7 +78,7 @@ func New() (logging.Logger, func() error, error) {
 	encoder := zapcore.NewConsoleEncoder(encoderCfg)
 
 	var level zapcore.Level
-	switch config.App.Logger.Level {
+	switch logLvl {
 	case "debug":
 		level = -1
 	case "info":

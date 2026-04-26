@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"avito-shop/internal/config"
 	"encoding/json"
 
 	"github.com/bytedance/sonic"
@@ -13,8 +12,8 @@ type JSONCodec interface {
 	Unmarshal(buf []byte, val interface{}) error
 }
 
-func NewJSONCodec() JSONCodec {
-	switch config.App.Tools.JSON {
+func NewJSONCodec(codecType string) JSONCodec {
+	switch codecType {
 	case "sonic":
 		return sonic.ConfigDefault
 	default:

@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"fmt"
@@ -14,14 +13,16 @@ type Hasher interface {
 	CompareHashAndPassword(hashedPassword []byte, password []byte) error
 }
 
-type bcryptHasher struct{}
+type bcryptHasher struct {
+	hashCost int
+}
 
-func NewHasher() Hasher {
-	return bcryptHasher{}
+func NewHasher(hashCost int) Hasher {
+	return bcryptHasher{hashCost}
 }
 
 func (h bcryptHasher) Hash(data string, logger logging.Logger) ([]byte, error) {
-	hashedData, err := bcrypt.GenerateFromPassword([]byte(data), config.App.Security.Hash.Cost)
+	hashedData, err := bcrypt.GenerateFromPassword([]byte(data), h.hashCost)
 	if err != nil {
 		logger.Error(
 			fmt.Sprintf(

@@ -1,7 +1,6 @@
 package api_middleware
 
 import (
-	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/tools"
@@ -45,7 +44,7 @@ func Auth(logger logging.Logger, tokenMaker tools.TokenMaker) func(handler http.
 				tools.WriteError(w, domain.ErrUnauthorized)
 				return
 			}
-			token, ok := strings.CutPrefix(token, config.App.Security.JWTToken.Prefix)
+			token, ok := strings.CutPrefix(token, tokenMaker.GetPrefix())
 			if !ok {
 				logger.Warn(
 					"Token without prefix",
