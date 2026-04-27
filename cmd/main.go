@@ -4,10 +4,12 @@ import (
 	"avito-shop/cmd/handler"
 	"avito-shop/internal/api_middleware"
 	"avito-shop/internal/config"
-	"avito-shop/internal/logging/logger_factory"
+	"avito-shop/internal/hasher"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/jwtmanager"
+	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
 	"avito-shop/internal/storage/postgres"
-	"avito-shop/internal/tools"
 	"context"
 	"errors"
 	"fmt"
@@ -34,14 +36,18 @@ func main() {
 		log.Fatalf("failed to load .env: %v", err)
 	}
 
-	logger, closeLogger, err := logger_factory.New(cfg.Logger.Type, cfg.ServerType, cfg.Logger.Level)
+	logger, closeLogger, err := logging.New(
+		cfg.Logger.Type,
+		cfg.ServerType,
+		cfg.Logger.Level,
+	)
 	if err != nil {
 		log.Fatalf("failed create logger: %v", err)
 	}
 	defer func() {
 		_ = logger.Sync()
 		if err = closeLogger(); err != nil {
-			logger.Fatal("failed to close log file: %v", err)
+			logger.Fatalf(err, "failed to close log file: %v", err)
 		}
 	}()
 
@@ -50,26 +56,26 @@ func main() {
 
 	conn, err := CreatePool(ctx, cfg.Storage)
 	if err != nil {
-		logger.Fatal(
-			"can't connect db",
+		logger.Fatalf(
 			err,
+			"can't connect db",
 		)
 	}
-	jsonCodec := tools.NewJSONCodec(cfg.Tools.JSON)
-	tokenMaker := tools.NewToken(
+	jsonCodec := jsoncodec.NewJSONCodec(cfg.Tools.JSON)
+	tokenMaker := jwtmanager.NewToken(
 		logger,
 		jsonCodec,
 		cfg.Security.JWTToken.Prefix,
 		cfg.Security.JWTToken.Lifetime,
 		cfg.Security.JWTToken.SecretKey,
 	)
-	hasher := tools.NewHasher(cfg.Security.Hash.Cost)
+	Hasher := hasher.NewHasher(cfg.Security.Hash.Cost)
 
 	storageAPI := postgres.NewStorageAPI(conn, logger)
 	serviceAPI := service.NewApi(storageAPI, logger)
 
 	storageAuth := postgres.NewStorageAuth(conn, logger)
-	serviceAuth := service.NewAuth(storageAuth, logger, tokenMaker, hasher)
+	serviceAuth := service.NewAuth(storageAuth, logger, tokenMaker, Hasher)
 
 	MainHandler := handler.NewMain(serviceAPI, logger, jsonCodec, cfg.Storage.QueryTimeout, tokenMaker)
 	AuthHandler := handler.NewAuth(serviceAuth, logger, jsonCodec, cfg.Storage.QueryTimeout)
@@ -95,7 +101,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		<-signalChan
-		logger.Info("Got exit signal, exit context")
+		logger.Infof("Got exit signal, exit context")
 		cancel()
 
 		shutDownCtx, shutdownCancel := context.WithTimeout(
@@ -105,9 +111,9 @@ func main() {
 		defer shutdownCancel()
 
 		if shutdownErr := server.Shutdown(shutDownCtx); err != nil {
-			logger.Error(
-				"failed to shutdown server gracefully",
+			logger.Errorf(
 				shutdownErr,
+				"failed to shutdown server gracefully",
 			)
 		}
 	}()
@@ -115,11 +121,11 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Info("Start HTTP-server")
+		logger.Infof("Start HTTP-server")
 		if listenErr := server.ListenAndServe(); err != nil && !errors.Is(listenErr, http.ErrServerClosed) {
-			logger.Fatal("http server failed", listenErr)
+			logger.Fatalf(listenErr, "http server failed")
 		} else {
-			logger.Info("Stop HTTP-server")
+			logger.Infof("Stop HTTP-server")
 		}
 	}()
 

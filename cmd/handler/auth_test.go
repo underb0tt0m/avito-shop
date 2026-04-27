@@ -5,7 +5,6 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/mocks"
-	"avito-shop/internal/tools"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -24,7 +23,7 @@ func TestAuth(t *testing.T) {
 	method := http.MethodPost
 	path := "/api/auth"
 	logger := mocks.NewLogger(nil)
-	jsonCodec := tools.NewJSONCodec()
+	jsonCodec := json.NewJSONCodec()
 
 	tests := []struct {
 		name           string

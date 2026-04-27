@@ -36,7 +36,7 @@ type Logger struct {
 }
 
 type Tools struct {
-	JSON string `yaml:"json"`
+	JSON string `yaml:"jsoncodec"`
 }
 
 type Security struct {

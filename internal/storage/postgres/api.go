@@ -38,9 +38,9 @@ WHERE a.name=$1
 ;`
 	rows, err := s.Conn.Query(ctx, userInfoStmt, username)
 	if err != nil {
-		s.Logger.Error(
-			"failed to query user inventory",
+		s.Logger.Errorf(
 			err,
+			"failed to query user inventory",
 		)
 		return 0, nil, nil, err
 	}
@@ -58,9 +58,10 @@ WHERE a.name=$1
 			&itemName,
 			&quantity,
 		); err != nil {
-			s.Logger.Error(
-				"failed to scan user inventory row",
+			s.Logger.Errorf(
+
 				err,
+				"failed to scan user inventory row",
 			)
 			return 0, nil, nil, err
 		}
@@ -99,9 +100,9 @@ WHERE b.name=$1 OR c.name=$1
 	)
 
 	if err != nil {
-		s.Logger.Error(
-			"failed to query user transactions",
+		s.Logger.Errorf(
 			err,
+			"failed to query user transactions",
 		)
 		return 0, nil, nil, err
 	}
@@ -112,9 +113,9 @@ WHERE b.name=$1 OR c.name=$1
 			&toUser,
 			&amount,
 		); err != nil {
-			s.Logger.Error(
-				"failed to scan user transaction row",
+			s.Logger.Errorf(
 				err,
+				"failed to scan user transaction row",
 			)
 			return 0, nil, nil, err
 		}
@@ -155,9 +156,9 @@ WHERE u1.name = $2 AND u2.name = $3;
 `
 	tx, err := s.Conn.Begin(ctx)
 	if err != nil {
-		s.Logger.Error(
-			"failed to begin transaction",
+		s.Logger.Errorf(
 			err,
+			"failed to begin transaction",
 		)
 		return err
 	}
@@ -172,23 +173,24 @@ WHERE u1.name = $2 AND u2.name = $3;
 	if err != nil {
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 			if pgErr.Code == "23514" {
-				s.Logger.Warn(
+				s.Logger.Warnf(
+					err,
 					"attempt to transfer money with insufficient balance",
-					err)
+				)
 				return domain.ErrInsufficientFunds
 			}
 		}
-		s.Logger.Error(
-			"failed to update sender balance",
+		s.Logger.Errorf(
 			err,
+			"failed to update sender balance",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if cmd1.RowsAffected() == 0 {
-		s.Logger.Error(
-			"sender not found",
+		s.Logger.Errorf(
 			domain.ErrNotFound,
+			"sender not found",
 		)
 		return domain.ErrNotFound // хотя такого быть не должно из логики работы приложения
 	}
@@ -200,17 +202,17 @@ WHERE u1.name = $2 AND u2.name = $3;
 		transaction.ToUser,
 	)
 	if err != nil {
-		s.Logger.Error(
-			"failed to update recipient balance",
+		s.Logger.Errorf(
 			err,
+			"failed to update recipient balance",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if cmd2.RowsAffected() == 0 {
-		s.Logger.Error(
-			"recipient not found",
+		s.Logger.Errorf(
 			domain.ErrNotFound,
+			"recipient not found",
 		)
 		return domain.ErrNotFound
 	}
@@ -223,17 +225,17 @@ WHERE u1.name = $2 AND u2.name = $3;
 		transaction.ToUser,
 	)
 	if err != nil {
-		s.Logger.Error(
-			"failed to insert transaction",
+		s.Logger.Errorf(
 			err,
+			"failed to insert transaction",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		s.Logger.Error(
-			"failed to commit transaction",
+		s.Logger.Errorf(
 			err,
+			"failed to commit transaction",
 		)
 		return err
 	}
@@ -244,9 +246,9 @@ WHERE u1.name = $2 AND u2.name = $3;
 func (s storageAPI) BuyItem(ctx context.Context, itemID int, user string) error {
 	tx, err := s.Conn.Begin(ctx)
 	if err != nil {
-		s.Logger.Error(
-			"failed to begin transaction",
+		s.Logger.Errorf(
 			err,
+			"failed to begin transaction",
 		)
 		return err
 	}
@@ -276,15 +278,15 @@ SET quantity = user_inventories.quantity + 1;
 		itemID,
 	).Scan(&itemPrice); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			s.Logger.Warn(
-				"attempt to buy nonexistent item",
+			s.Logger.Warnf(
 				err,
+				"attempt to buy nonexistent item",
 			)
 			return domain.ErrNotFound
 		}
-		s.Logger.Error(
-			"failed to get item cost",
+		s.Logger.Errorf(
 			err,
+			"failed to get item cost",
 		)
 		return domain.ErrInternalServerError
 	}
@@ -298,39 +300,40 @@ SET quantity = user_inventories.quantity + 1;
 	).Scan(&userID); err != nil {
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 			if pgErr.Code == "23514" {
-				s.Logger.Warn(
+				s.Logger.Warnf(
+					err,
 					"attempt to transfer money with insufficient balance",
-					err)
+				)
 				return domain.ErrInsufficientFunds
 			}
 		}
 
 		if errors.Is(err, pgx.ErrNoRows) {
-			s.Logger.Warn(
-				"user doesn't exist",
+			s.Logger.Warnf(
 				err,
+				"user doesn't exist",
 			)
 			return domain.ErrNotFound
 		}
-		s.Logger.Error(
-			"failed to update user balance",
+		s.Logger.Errorf(
 			err,
+			"failed to update user balance",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if _, err = tx.Exec(ctx, insertStmt, userID, itemID); err != nil {
-		s.Logger.Error(
-			"failed to insert row in user_inventories",
+		s.Logger.Errorf(
 			err,
+			"failed to insert row in user_inventories",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		s.Logger.Error(
-			"failed to commit transaction",
+		s.Logger.Errorf(
 			err,
+			"failed to commit transaction",
 		)
 		return domain.ErrInternalServerError
 	}

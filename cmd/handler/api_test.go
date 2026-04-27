@@ -5,7 +5,6 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/mocks"
-	"avito-shop/internal/tools"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -26,7 +25,7 @@ func TestInfo(t *testing.T) {
 	token := "Bearer test"
 	logger := mocks.NewLogger(nil)
 	tokenMaker := mocks.NewToken(nil, nil, nil)
-	jsonCodec := tools.NewJSONCodec()
+	jsonCodec := json.NewJSONCodec()
 
 	tests := []struct {
 		name           string
@@ -122,7 +121,7 @@ func TestSendCoin(t *testing.T) {
 	token := "Bearer test"
 	logger := mocks.NewLogger(nil)
 	tokenMaker := mocks.NewToken(nil, nil, nil)
-	jsonCodec := tools.NewJSONCodec()
+	jsonCodec := json.NewJSONCodec()
 
 	tests := []struct {
 		name           string
@@ -238,7 +237,7 @@ func TestBuyItem(t *testing.T) {
 	token := "Bearer token"
 	logger := mocks.NewLogger(nil)
 	tokenMaker := mocks.NewToken(nil, nil, nil)
-	jsonCodec := tools.NewJSONCodec()
+	jsonCodec := json.NewJSONCodec()
 
 	tests := []struct {
 		name           string

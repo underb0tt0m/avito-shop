@@ -1,9 +1,9 @@
-package tools
+package jwtmanager
 
 import (
 	"avito-shop/internal/domain"
+	jsoncodec "avito-shop/internal/jsoncodec"
 	"avito-shop/internal/logging"
-	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,7 +18,7 @@ type TokenMaker interface {
 
 type jwtTokenMaker struct {
 	logger      logging.Logger
-	jsonCodec   JSONCodec
+	jsonCodec   jsoncodec.JSONCodec
 	tokenPrefix string
 	lifetime    time.Duration
 	secret      []byte
@@ -26,7 +26,7 @@ type jwtTokenMaker struct {
 
 func NewToken(
 	logger logging.Logger,
-	jsonCodec JSONCodec,
+	jsonCodec jsoncodec.JSONCodec,
 	tokenPrefix string,
 	lifetime time.Duration,
 	secret []byte,
@@ -43,9 +43,9 @@ func NewToken(
 func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	jsonBytes, err := t.jsonCodec.Marshal(data)
 	if err != nil {
-		t.logger.Error(
-			"failed to marshal token data",
+		t.logger.Errorf(
 			err,
+			"failed to marshal token data",
 		)
 		return "", err
 	}
@@ -55,9 +55,9 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 		jsonBytes,
 		&mapClaims,
 	); err != nil {
-		t.logger.Error(
-			"failed to unmarshal token data",
+		t.logger.Errorf(
 			err,
+			"failed to unmarshal token data",
 		)
 		return "", err
 	}
@@ -69,9 +69,9 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mapClaims)
 	tokenString, err := token.SignedString(t.secret)
 	if err != nil {
-		t.logger.Error(
-			"failed to sign token",
+		t.logger.Errorf(
 			err,
+			"failed to sign token",
 		)
 		return "", err
 	}
@@ -81,9 +81,9 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 func (t jwtTokenMaker) ValidateUserToken(tokenString string) error {
 	_, err := jwt.Parse(tokenString, createKeyFunc(t.logger, t.secret))
 	if err != nil {
-		t.logger.Error(
-			"invalid token",
+		t.logger.Errorf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return domain.ErrInvalidToken
 	}
@@ -93,25 +93,25 @@ func (t jwtTokenMaker) ValidateUserToken(tokenString string) error {
 func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string) ([]byte, error) {
 	token, err := jwt.Parse(tokenString, createKeyFunc(t.logger, t.secret))
 	if err != nil {
-		t.logger.Warn(
-			"invalid token",
+		t.logger.Warnf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
 	if !token.Valid {
-		t.logger.Warn(
-			"invalid token",
+		t.logger.Warnf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		t.logger.Warn(
-			"invalid token",
+		t.logger.Warnf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
@@ -125,12 +125,10 @@ func (t jwtTokenMaker) GetPrefix() string {
 func createKeyFunc(logger logging.Logger, secret []byte) jwt.Keyfunc {
 	return func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			logger.Error(
-				fmt.Sprintf(
-					"unexpected signing method: %v",
-					token.Header["alg"],
-				),
+			logger.Errorf(
 				domain.ErrWrongSigningMethod,
+				"unexpected signing method: %v",
+				token.Header["alg"],
 			)
 			return nil, domain.ErrWrongSigningMethod
 		}

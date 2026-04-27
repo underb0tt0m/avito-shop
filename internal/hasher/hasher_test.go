@@ -1,4 +1,4 @@
-package tools
+package hasher
 
 import (
 	"avito-shop/internal/config"

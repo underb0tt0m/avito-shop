@@ -4,7 +4,6 @@ import (
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/tools"
-	"avito-shop/internal/tools/consts"
 	"context"
 	"net/http"
 )
@@ -14,7 +13,7 @@ func Auth(logger logging.Logger, tokenMaker tools.TokenMaker) func(handler http.
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(
 				r.Context(),
-				consts.UserContextKey,
+				domain.UserContextKey,
 				domain.DefaultUser{
 					UserName: "test",
 				},

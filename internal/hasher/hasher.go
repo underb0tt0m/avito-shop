@@ -1,9 +1,8 @@
-package tools
+package hasher
 
 import (
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
-	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,17 +17,15 @@ type bcryptHasher struct {
 }
 
 func NewHasher(hashCost int) Hasher {
-	return bcryptHasher{hashCost}
+	return bcryptHasher{hashCost: hashCost}
 }
 
 func (h bcryptHasher) Hash(data string, logger logging.Logger) ([]byte, error) {
 	hashedData, err := bcrypt.GenerateFromPassword([]byte(data), h.hashCost)
 	if err != nil {
-		logger.Error(
-			fmt.Sprintf(
-				"failed to hash data",
-			),
+		logger.Errorf(
 			err,
+			"failed to hash data",
 		)
 		return []byte{}, domain.ErrInternalServerError
 	}

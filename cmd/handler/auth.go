@@ -3,9 +3,9 @@ package handler
 import (
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
-	"avito-shop/internal/tools"
 	"context"
 	"fmt"
 	"io"
@@ -18,14 +18,14 @@ import (
 type Auth struct {
 	service      service.Auth
 	logger       logging.Logger
-	jsonCodec    tools.JSONCodec
+	jsonCodec    jsoncodec.JSONCodec
 	queryTimeout time.Duration
 }
 
 func NewAuth(
 	service service.Auth,
 	logger logging.Logger,
-	jsonCodec tools.JSONCodec,
+	jsonCodec jsoncodec.JSONCodec,
 	queryTimeout time.Duration,
 ) Auth {
 	return Auth{
@@ -45,11 +45,11 @@ func (h Auth) Auth(r chi.Router) {
 		requestBody, err := io.ReadAll(r.Body)
 		defer func() { _ = r.Body.Close() }()
 		if err != nil {
-			h.logger.Error(
-				"failed to read auth request body",
+			h.logger.Errorf(
 				err,
+				"failed to read auth request body",
 			)
-			tools.WriteError(w, err)
+			domain.WriteError(w, err)
 			return
 		}
 
@@ -58,17 +58,17 @@ func (h Auth) Auth(r chi.Router) {
 			requestBody,
 			&user,
 		); err != nil {
-			h.logger.Error(
-				"failed to unmarshal auth request body",
+			h.logger.Errorf(
 				err,
+				"failed to unmarshal auth request body",
 			)
-			tools.WriteError(w, domain.ErrUnprocessableEntity)
+			domain.WriteError(w, domain.ErrUnprocessableEntity)
 			return
 		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 		defer cancel()
-		h.logger.Debug(
+		h.logger.Debugf(
 			fmt.Sprintf(
 				"calling AuthService Auth method, username: %v",
 				user.Name,
@@ -76,33 +76,31 @@ func (h Auth) Auth(r chi.Router) {
 		)
 		token, err := h.service.Auth(ctx, user)
 		if err != nil {
-			h.logger.Warn(
-				fmt.Sprintf(
-					"authentication denied, username: %v",
-					user.Name,
-				),
+			h.logger.Warnf(
 				err,
+				"authentication denied, username: %v",
+				user.Name,
 			)
-			tools.WriteError(w, err)
+			domain.WriteError(w, err)
 			return
 		}
 
 		responseBody, err := h.jsonCodec.Marshal(token)
 		if err != nil {
-			h.logger.Error(
-				"failed to marshal auth response body",
+			h.logger.Errorf(
 				err,
+				"failed to marshal auth response body",
 			)
-			tools.WriteError(w, err)
+			domain.WriteError(w, err)
 			return
 		}
 
 		if _, err = w.Write(responseBody); err != nil {
-			h.logger.Error(
-				"failed to write auth response",
+			h.logger.Errorf(
 				err,
+				"failed to write auth response",
 			)
-			tools.WriteError(w, err)
+			domain.WriteError(w, err)
 			return
 		}
 	})

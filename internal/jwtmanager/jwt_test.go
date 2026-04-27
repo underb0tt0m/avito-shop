@@ -1,4 +1,4 @@
-package tools
+package jwtmanager
 
 import (
 	"avito-shop/internal/config"

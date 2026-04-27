@@ -2,12 +2,10 @@ package api_middleware
 
 import (
 	"avito-shop/internal/domain"
+	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
-	"avito-shop/internal/tools"
-	"avito-shop/internal/tools/consts"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -19,44 +17,42 @@ func Stopwatch(logger logging.Logger) func(handler http.Handler) http.Handler {
 			start := time.Now()
 			next.ServeHTTP(w, r)
 			duration := time.Since(start).Milliseconds()
-			logger.Info(
-				fmt.Sprintf(
-					"method: %v, path: %v, address: %v, duration: %v ms",
-					r.Method,
-					r.URL.Path,
-					r.RemoteAddr,
-					duration,
-				),
+			logger.Infof(
+				"method: %v, path: %v, address: %v, duration: %v ms",
+				r.Method,
+				r.URL.Path,
+				r.RemoteAddr,
+				duration,
 			)
 		})
 	}
 }
 
-func Auth(logger logging.Logger, tokenMaker tools.TokenMaker) func(handler http.Handler) http.Handler {
+func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
 			if token == "" {
-				logger.Warn(
-					"user unauthorized",
+				logger.Warnf(
 					domain.ErrUnauthorized,
+					"user unauthorized",
 				)
-				tools.WriteError(w, domain.ErrUnauthorized)
+				domain.WriteError(w, domain.ErrUnauthorized)
 				return
 			}
 			token, ok := strings.CutPrefix(token, tokenMaker.GetPrefix())
 			if !ok {
-				logger.Warn(
-					"Token without prefix",
+				logger.Warnf(
 					domain.ErrInvalidToken,
+					"Token without prefix",
 				)
-				tools.WriteError(w, domain.ErrInvalidToken)
+				domain.WriteError(w, domain.ErrInvalidToken)
 				return
 			}
 			token = strings.TrimSpace(token)
 			jsonBytes, err := tokenMaker.ParseUserTokenRaw(token)
 			if err != nil {
-				tools.WriteError(w, err)
+				domain.WriteError(w, err)
 				return
 			}
 			var claims domain.DefaultUser
@@ -64,24 +60,24 @@ func Auth(logger logging.Logger, tokenMaker tools.TokenMaker) func(handler http.
 				jsonBytes,
 				&claims,
 			); err != nil {
-				logger.Error(
-					"failed to unmarshal token",
+				logger.Errorf(
 					err,
+					"failed to unmarshal token",
 				)
-				tools.WriteError(w, domain.ErrBadRequest)
+				domain.WriteError(w, domain.ErrBadRequest)
 				return
 			}
 
 			if claims.ExpiresAt.Unix() < time.Now().Unix() {
-				logger.Warn(
-					"token is expired",
+				logger.Warnf(
 					domain.ErrTokenExpired,
+					"token is expired",
 				)
-				tools.WriteError(w, domain.ErrTokenExpired)
+				domain.WriteError(w, domain.ErrTokenExpired)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), consts.UserContextKey, claims)
+			ctx := context.WithValue(r.Context(), domain.UserContextKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

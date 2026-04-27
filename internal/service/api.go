@@ -33,19 +33,19 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 	userBalance, userInventories, userTransactions, err := s.Storage.GetUserInfo(ctx, username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			s.Logger.Error(
-				"user is missing from the database",
+			s.Logger.Errorf(
 				err,
+				"user is missing from the database",
 			)
 			return nil, domain.ErrNotFound
 		}
-		s.Logger.Error(
-			"failed to get user info from mainRoutRepository",
+		s.Logger.Errorf(
 			err,
+			"failed to get user info from mainRoutRepository",
 		)
 		return nil, err
 	}
-	s.Logger.Debug("received data from mainRoutRepository")
+	s.Logger.Debugf("received data from mainRoutRepository")
 
 	var userInventory []domain.Item
 	for _, item := range userInventories {
@@ -54,7 +54,7 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 			Quantity: item.Quantity,
 		})
 	}
-	s.Logger.Debug("inventory mapped")
+	s.Logger.Debugf("inventory mapped")
 
 	var receivedTransactions []domain.ReceivedTransaction
 	var sentTransactions []domain.SentTransaction
@@ -71,7 +71,7 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 			})
 		}
 	}
-	s.Logger.Debug("transactions mapped")
+	s.Logger.Debugf("transactions mapped")
 
 	userDomain := domain.User{
 		Coins:     userBalance,
@@ -113,16 +113,17 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 		},
 	}
 
-	s.Logger.Debug("preparing response")
+	s.Logger.Debugf("preparing response")
 
 	return &dtoUser, nil
 }
 
 func (s api) SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error {
 	if toUser.Amount <= 0 {
-		s.Logger.Warn(
+		s.Logger.Warnf(
+			domain.ErrBadRequest,
 			"attempt to send unnatural amount of coins",
-			domain.ErrBadRequest)
+		)
 		return domain.ErrBadRequest
 	}
 
