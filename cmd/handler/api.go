@@ -52,123 +52,129 @@ func (h Main) RegisterRoutes(r chi.Router) {
 }
 
 func (h Main) GetInfo(r chi.Router) {
-	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
-		user, err := domain.GetUserFromContext(r)
-		if err != nil {
-			domain.WriteError(w, err)
-			return
-		}
+	r.Get("/info", h.handleInfo)
+}
 
-		h.logger.Debugf("JWT token is valid")
-		username := user.UserName
+func (h Main) handleInfo(w http.ResponseWriter, r *http.Request) {
+	user, err := domain.GetUserFromContext(r)
+	if err != nil {
+		domain.WriteError(w, err)
+		return
+	}
 
-		ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
-		defer cancel()
-		h.logger.Debugf("calling mainRoutService GetUserInfo method")
-		dtoUser, err := h.service.GetUserInfo(ctx, username)
-		if err != nil {
-			domain.WriteError(w, err)
-			return
-		}
+	h.logger.Debugf("JWT token is valid")
+	username := user.UserName
 
-		response, err := h.jsonCodec.MarshalIndent(dtoUser, "", "	")
-		if err != nil {
-			h.logger.Errorf(
-				err,
-				"failed to marshal user info response",
-			)
-			domain.WriteError(w, err)
-			return
-		}
-		if _, err = w.Write(response); err != nil {
-			h.logger.Errorf(
-				err,
-				"failed to write info response",
-			)
-			domain.WriteError(w, err)
-			return
-		}
-	})
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
+	defer cancel()
+	h.logger.Debugf("calling mainRoutService GetUserInfo method")
+	dtoUser, err := h.service.GetUserInfo(ctx, username)
+	if err != nil {
+		domain.WriteError(w, err)
+		return
+	}
+
+	response, err := h.jsonCodec.MarshalIndent(dtoUser, "", "	")
+	if err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to marshal user info response",
+		)
+		domain.WriteError(w, err)
+		return
+	}
+	if _, err = w.Write(response); err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to write info response",
+		)
+		domain.WriteError(w, err)
+		return
+	}
 }
 
 func (h Main) SendCoin(r chi.Router) {
-	r.Post("/sendCoin", func(w http.ResponseWriter, r *http.Request) {
-		requestBody, err := io.ReadAll(r.Body)
-		defer func() { _ = r.Body.Close() }()
-		if err != nil {
-			h.logger.Errorf(
-				err,
-				"failed to read request body",
-			)
-			domain.WriteError(w, err)
-			return
-		}
+	r.Post("/sendCoin", h.handleSendCoin)
+}
 
-		transaction := dto.SendCoinRequest{}
-		if err = h.jsonCodec.Unmarshal(
-			requestBody,
-			&transaction,
-		); err != nil {
-			h.logger.Errorf(
-				err,
-				"failed to unmarshal request body",
-			)
-			domain.WriteError(w, domain.ErrUnprocessableEntity)
-			return
-		}
+func (h Main) handleSendCoin(w http.ResponseWriter, r *http.Request) {
+	requestBody, err := io.ReadAll(r.Body)
+	defer func() { _ = r.Body.Close() }()
+	if err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to read request body",
+		)
+		domain.WriteError(w, err)
+		return
+	}
 
-		user, err := domain.GetUserFromContext(r)
-		if err != nil {
-			domain.WriteError(w, err)
-			return
-		}
+	transaction := dto.SendCoinRequest{}
+	if err = h.jsonCodec.Unmarshal(
+		requestBody,
+		&transaction,
+	); err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to unmarshal request body",
+		)
+		domain.WriteError(w, domain.ErrUnprocessableEntity)
+		return
+	}
 
-		ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
-		defer cancel()
-		if err = h.service.SendCoins(
-			ctx,
-			user.UserName,
-			transaction,
-		); err != nil {
-			domain.WriteError(w, err)
-			return
-		}
-	})
+	user, err := domain.GetUserFromContext(r)
+	if err != nil {
+		domain.WriteError(w, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
+	defer cancel()
+	if err = h.service.SendCoins(
+		ctx,
+		user.UserName,
+		transaction,
+	); err != nil {
+		domain.WriteError(w, err)
+		return
+	}
 }
 
 func (h Main) BuyItem(r chi.Router) {
-	r.Post("/buy/{itemID}", func(w http.ResponseWriter, r *http.Request) {
-		user, err := domain.GetUserFromContext(r)
-		if err != nil {
-			domain.WriteError(w, err)
-			return
-		}
+	r.Post("/buy/{itemID}", h.handleBuyItem)
+}
 
-		strItemID := chi.URLParam(r, "itemID")
-		if strItemID == "" {
-			h.logger.Warnf(
-				domain.ErrBadRequest,
-				"attempt to buy item with empty param {item}",
-			)
-			domain.WriteError(w, domain.ErrBadRequest)
-			return
-		}
+func (h Main) handleBuyItem(w http.ResponseWriter, r *http.Request) {
+	user, err := domain.GetUserFromContext(r)
+	if err != nil {
+		domain.WriteError(w, err)
+		return
+	}
 
-		itemID, err := strconv.Atoi(strItemID)
-		if err != nil {
-			h.logger.Warnf(
-				domain.ErrBadRequest,
-				"attempt to buy item with invalid id",
-			)
-			domain.WriteError(w, domain.ErrBadRequest)
-			return
-		}
+	strItemID := chi.URLParam(r, "itemID")
+	if strItemID == "" {
+		h.logger.Warnf(
+			domain.ErrBadRequest,
+			"attempt to buy item with empty param {item}",
+		)
+		domain.WriteError(w, domain.ErrBadRequest)
+		return
+	}
 
-		ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
-		defer cancel()
-		if err = h.service.BuyItem(ctx, itemID, user.UserName); err != nil {
-			domain.WriteError(w, err)
-			return
-		}
-	})
+	itemID, err := strconv.Atoi(strItemID)
+	if err != nil {
+		h.logger.Warnf(
+			domain.ErrBadRequest,
+			"attempt to buy item with invalid id",
+		)
+		domain.WriteError(w, domain.ErrBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
+	defer cancel()
+	if err = h.service.BuyItem(ctx, itemID, user.UserName); err != nil {
+		domain.WriteError(w, err)
+		return
+	}
 }

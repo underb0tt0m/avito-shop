@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+//go:generate mockgen -source=jwt.go -destination=../mocks/jwt.go -package=mocks -mock_names=TokenMaker=TokenMaker
 type TokenMaker interface {
 	CreateToken(data any) (string, error)
 	ValidateUserToken(tokenString string) error

@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+//go:generate mockgen -source=hasher.go -destination=../mocks/hasher.go -package=mocks -mock_names=Hasher=Hasher
 type Hasher interface {
 	Hash(data string, logger logging.Logger) ([]byte, error)
 	CompareHashAndPassword(hashedPassword []byte, password []byte) error

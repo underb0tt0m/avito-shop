@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-//go:generate mockgen -source=api.go -destination=../mocks/service_api.go -package=mocks -mock_names=API=MockServiceAPI
+//go:generate mockgen -source=api.go -destination=../mocks/service_api.go -package=mocks -mock_names=API=ServiceAPI
 type API interface {
 	GetUserInfo(ctx context.Context, username string) (*dto.InfoResponse, error)
 	SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error

@@ -23,8 +23,6 @@ func New(realisation string, serverType string, logLvl string) (Logger, func() e
 	switch realisation {
 	case "zap_logging":
 		return newZap(serverType, logLvl)
-	case "noop":
-		return loggerNoop{}, nil, nil
 	default:
 		err := fmt.Errorf(
 			"unknown logger type in the configuration: %v",
@@ -133,18 +131,18 @@ func newZap(serverType string, logLvl string) (Logger, func() error, error) {
 	return loggerZap{Logger: l}, logFile.Close, nil
 }
 
-type loggerNoop struct{}
+type LoggerNoop struct{}
 
-func (l loggerNoop) Debugf(msg string, v ...any) {}
+func (l LoggerNoop) Debugf(msg string, v ...any) {}
 
-func (l loggerNoop) Infof(msg string, v ...any) {}
+func (l LoggerNoop) Infof(msg string, v ...any) {}
 
-func (l loggerNoop) Warnf(err error, msg string, v ...any) {}
+func (l LoggerNoop) Warnf(err error, msg string, v ...any) {}
 
-func (l loggerNoop) Errorf(err error, msg string, v ...any) {}
+func (l LoggerNoop) Errorf(err error, msg string, v ...any) {}
 
-func (l loggerNoop) Fatalf(err error, msg string, v ...any) {}
+func (l LoggerNoop) Fatalf(err error, msg string, v ...any) {}
 
-func (l loggerNoop) Sync() error {
+func (l LoggerNoop) Sync() error {
 	return nil
 }

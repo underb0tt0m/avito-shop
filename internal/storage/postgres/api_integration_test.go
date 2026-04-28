@@ -4,14 +4,13 @@ import (
 	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
-	"avito-shop/internal/mocks"
 	"avito-shop/internal/storage/views"
-	"avito-shop/internal/tools"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"testing"
@@ -49,14 +48,17 @@ var (
 		ToUserID   int
 		Amount     int
 	}
+	Cfg *config.Config
 )
 
 func TestMain(m *testing.M) {
-	if err := config.Init("../../../cmd/config.yaml"); err != nil {
-		panic(errors.Join(
+	cfg, err := config.Load("../../../cmd/config.yaml")
+	if err != nil {
+		log.Fatal(errors.Join(
 			errors.New("failed to load config: "),
 			err))
 	}
+	Cfg = cfg
 	testCtx = context.Background()
 
 	testNetwork, err := network.New(testCtx)
@@ -68,7 +70,7 @@ func TestMain(m *testing.M) {
 	}
 	defer testNetwork.Remove(testCtx)
 
-	dbImg := config.App.Storage.Type + ":" + config.App.Storage.Version
+	dbImg := cfg.Storage.Type + ":" + cfg.Storage.Version
 	dbEnvs := map[string]string{
 		"POSTGRES_USER":     "postgres",
 		"POSTGRES_PASSWORD": "postgres",
@@ -82,10 +84,10 @@ func TestMain(m *testing.M) {
 			testNetwork.Name: {dbNetworkAlias},
 		},
 		Env:          dbEnvs,
-		ExposedPorts: []string{config.App.Storage.Connection.Port},
+		ExposedPorts: []string{cfg.Storage.Connection.Port},
 		WaitingFor: wait.ForAll(
 			wait.ForLog("database system is ready to accept connections"),
-			wait.ForListeningPort(config.App.Storage.Connection.Port),
+			wait.ForListeningPort(cfg.Storage.Connection.Port),
 		),
 	}
 	postgresC, err := testcontainers.GenericContainer(testCtx, testcontainers.GenericContainerRequest{
@@ -118,7 +120,7 @@ func TestMain(m *testing.M) {
 					fmt.Sprintf(
 						"postgresql://postgres:postgres@%s:%s/avito_shop?sslmode=disable",
 						dbNetworkAlias,
-						config.App.Storage.Connection.Port,
+						cfg.Storage.Connection.Port,
 					),
 					"up",
 				},
@@ -275,18 +277,18 @@ func TestMain(m *testing.M) {
 		},
 	}
 
-	mappedPort, _ := postgresC.MappedPort(testCtx, config.App.Storage.Connection.Port)
-	config.App.Storage.Connection.Port = mappedPort.Port()
-	config.App.Storage.Connection.User = "postgres"
-	config.App.Storage.Connection.Password = "postgres"
-	testPool, err = tools.CreatePool(testCtx)
+	mappedPort, _ := postgresC.MappedPort(testCtx, cfg.Storage.Connection.Port)
+	cfg.Storage.Connection.Port = mappedPort.Port()
+	cfg.Storage.Connection.User = "postgres"
+	cfg.Storage.Connection.Password = "postgres"
+	testPool, err = CreatePool(testCtx, cfg.Storage)
 	if err != nil {
 		panic(errors.Join(
 			errors.New("failed to create pool: "),
 			err))
 	}
 
-	testLogger = mocks.NewLogger(nil)
+	testLogger = logging.LoggerNoop{}
 
 	code := m.Run()
 	os.Exit(code)
@@ -360,7 +362,7 @@ func TestGetUserInfo(t *testing.T) {
 			}
 
 			testStorage := NewStorageAPI(testPool, testLogger)
-			queryCtx, cancel := context.WithTimeout(testCtx, config.App.Storage.QueryTimeout)
+			queryCtx, cancel := context.WithTimeout(testCtx, Cfg.Storage.QueryTimeout)
 			defer cancel()
 			userBalance, userInventories, userTransactions, err := testStorage.GetUserInfo(queryCtx, tt.username)
 
@@ -450,7 +452,7 @@ func TestSendCoins(t *testing.T) {
 			beforeToBalance, checkBalanceErr := checkBalance(tt.transaction.ToUser)
 
 			testStorage := NewStorageAPI(testPool, testLogger)
-			queryCtx, cancel := context.WithTimeout(testCtx, config.App.Storage.QueryTimeout)
+			queryCtx, cancel := context.WithTimeout(testCtx, Cfg.Storage.QueryTimeout)
 			defer cancel()
 			err := testStorage.SendCoins(queryCtx, tt.fromUser, tt.transaction)
 
@@ -526,7 +528,7 @@ func TestBuyItem(t *testing.T) {
 			}
 
 			testStorage := NewStorageAPI(testPool, testLogger)
-			queryCtx, cancel := context.WithTimeout(testCtx, config.App.Storage.QueryTimeout)
+			queryCtx, cancel := context.WithTimeout(testCtx, Cfg.Storage.QueryTimeout)
 			defer cancel()
 			err := testStorage.BuyItem(queryCtx, tt.itemID, tt.user)
 
@@ -637,4 +639,22 @@ WHERE name = $1;
 		return 0, err
 	}
 	return balance, nil
+}
+
+func CreatePool(ctx context.Context, connParam config.Storage) (*pgxpool.Pool, error) {
+	connStr := fmt.Sprintf(
+		"%v://%v:%v@%v:%v/%v",
+		connParam.Connection.Driver,
+		connParam.Connection.User,
+		connParam.Connection.Password,
+		connParam.Connection.Host,
+		connParam.Connection.Port,
+		connParam.Connection.Database,
+	)
+
+	pool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
 }

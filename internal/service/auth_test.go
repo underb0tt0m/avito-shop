@@ -2,173 +2,342 @@ package service
 
 import (
 	"avito-shop/cmd/dto"
-	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
+	"avito-shop/internal/hasher"
+	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/mocks"
 	"avito-shop/internal/storage"
-	"avito-shop/internal/tools"
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/mock/gomock"
 )
 
-func TestAuth(t *testing.T) {
+func Test_auth_Auth(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ctx := context.Background()
+
+	logger := logging.LoggerNoop{}
+
+	hasherMock := mocks.NewHasher(ctrl)
+	tokenMaker := mocks.NewTokenMaker(ctrl)
+	storageMock := mocks.NewStorageAuth(ctrl)
+
+	type fields struct {
+		Storage    storage.Auth
+		Logger     logging.Logger
+		TokenMaker jwtmanager.TokenMaker
+		Hasher     hasher.Hasher
+	}
+	type mockSetups struct {
+		Storage    func(m *mocks.StorageAuth)
+		TokenMaker func(m *mocks.TokenMaker)
+		Hasher     func(m *mocks.Hasher)
+	}
+	type args struct {
+		ctx  context.Context
+		data dto.AuthRequest
+	}
 	tests := []struct {
 		name            string
-		data            dto.AuthRequest
-		mockStorage     storage.Auth
-		tokenMaker      tools.TokenMaker
-		hasher          tools.Hasher
-		expected        dto.AuthResponse
+		fields          fields
+		mockSetups      mockSetups
+		args            args
+		want            dto.AuthResponse
 		wantErr         bool
 		wantSpecificErr error
 	}{
 		{
-			"success_new_user_created",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(nil, nil),
-			mocks.NewToken(nil, nil, nil),
-			mocks.NewHasher(nil, nil),
-			dto.AuthResponse{Token: "test"},
-			false,
-			nil,
+			name: "success_existing_user_authenticated",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage: func(m *mocks.StorageAuth) {
+					m.EXPECT().
+						GetHashedUserPassword(ctx, "success_existing_user_authenticated").
+						Return([]byte("success_existing_user_authenticated"), nil)
+				},
+				TokenMaker: func(m *mocks.TokenMaker) {
+					m.EXPECT().
+						CreateToken(domain.DefaultUser{UserName: "success_existing_user_authenticated"}).
+						Return("success_existing_user_authenticated", nil)
+				},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("success_existing_user_authenticated", logger).
+						Return([]byte("success_existing_user_authenticated"), nil)
+					m.EXPECT().
+						CompareHashAndPassword([]byte("success_existing_user_authenticated"), []byte("success_existing_user_authenticated")).
+						Return(nil)
+				},
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "success_existing_user_authenticated",
+					Password: "success_existing_user_authenticated",
+				},
+			},
+			want:            dto.AuthResponse{Token: "success_existing_user_authenticated"},
+			wantErr:         false,
+			wantSpecificErr: nil,
 		},
 
 		{
-			"success_existing_user_authenticated",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(
-				func(ctx context.Context, username string) ([]byte, error) {
-					return []byte{}, pgx.ErrNoRows
+			name: "error_wrong_password",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage: func(m *mocks.StorageAuth) {
+					m.EXPECT().
+						GetHashedUserPassword(ctx, "error_wrong_password").
+						Return([]byte("error_wrong_password"), nil)
 				},
-				nil,
-			),
-			mocks.NewToken(nil, nil, nil),
-			mocks.NewHasher(nil, nil),
-			dto.AuthResponse{Token: "test"},
-			false,
-			nil,
+				TokenMaker: func(m *mocks.TokenMaker) {},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("bimbimbambam", logger).
+						Return([]byte("error_wrong_password"), nil)
+					m.EXPECT().
+						CompareHashAndPassword([]byte("error_wrong_password"), []byte("bimbimbambam")).
+						Return(errors.New("Some error"))
+				},
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "error_wrong_password",
+					Password: "bimbimbambam",
+				},
+			},
+			want:            dto.AuthResponse{},
+			wantErr:         true,
+			wantSpecificErr: domain.ErrUnauthorized,
 		},
 
 		{
-			"error_wrong_password",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(nil, nil),
-			mocks.NewToken(nil, nil, nil),
-			mocks.NewHasher(
-				nil,
-				func(hashedPassword []byte, password []byte) error {
-					return errors.New("test")
+			name: "success_new_user_created",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage: func(m *mocks.StorageAuth) {
+					m.EXPECT().
+						GetHashedUserPassword(ctx, "success_new_user_created").
+						Return(nil, pgx.ErrNoRows)
+					m.EXPECT().
+						CreateUser(ctx, domain.HashedUserData{
+							Name:     "success_new_user_created",
+							Password: []byte("success_new_user_created"),
+						}).
+						Return([]byte("success_new_user_created"), nil)
 				},
-			),
-			dto.AuthResponse{},
-			true,
-			domain.ErrUnauthorized,
+				TokenMaker: func(m *mocks.TokenMaker) {
+					m.EXPECT().
+						CreateToken(domain.DefaultUser{UserName: "success_new_user_created"}).
+						Return("success_new_user_created", nil)
+				},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("success_new_user_created", logger).
+						Return([]byte("success_new_user_created"), nil)
+					m.EXPECT().
+						CompareHashAndPassword([]byte("success_new_user_created"), []byte("success_new_user_created")).
+						Return(nil)
+				},
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "success_new_user_created",
+					Password: "success_new_user_created",
+				},
+			},
+			want:            dto.AuthResponse{Token: "success_new_user_created"},
+			wantErr:         false,
+			wantSpecificErr: nil,
 		},
 
 		{
-			"error_database_unavailable_on_get",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(
-				func(ctx context.Context, username string) ([]byte, error) {
-					return []byte{}, errors.New("test")
+			name: "error_database_unavailable_on_get",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage: func(m *mocks.StorageAuth) {
+					m.EXPECT().
+						GetHashedUserPassword(ctx, "error_database_unavailable_on_get").
+						Return([]byte{}, errors.New("Some error"))
 				},
-				nil,
-			),
-			mocks.NewToken(nil, nil, nil),
-			mocks.NewHasher(nil, nil),
-			dto.AuthResponse{},
-			true,
-			nil,
+				TokenMaker: func(m *mocks.TokenMaker) {},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("error_database_unavailable_on_get", logger).
+						Return([]byte("error_database_unavailable_on_get"), nil)
+				},
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "error_database_unavailable_on_get",
+					Password: "error_database_unavailable_on_get",
+				},
+			},
+			want:            dto.AuthResponse{},
+			wantErr:         true,
+			wantSpecificErr: nil,
 		},
 
 		{
-			"error_token_creation_failed",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(nil, nil),
-			mocks.NewToken(
-				func(data any) (string, error) {
-					return "", errors.New("test")
+			name: "error_token_creation_failed",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage: func(m *mocks.StorageAuth) {
+					m.EXPECT().
+						GetHashedUserPassword(ctx, "error_token_creation_failed").
+						Return([]byte("error_token_creation_failed"), nil)
 				},
-				nil,
-				nil,
-			),
-			mocks.NewHasher(nil, nil),
-			dto.AuthResponse{},
-			true,
-			nil,
+				TokenMaker: func(m *mocks.TokenMaker) {
+					m.EXPECT().
+						CreateToken(domain.DefaultUser{UserName: "error_token_creation_failed"}).
+						Return("", errors.New("Some error"))
+				},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("error_token_creation_failed", logger).
+						Return([]byte("error_token_creation_failed"), nil)
+					m.EXPECT().
+						CompareHashAndPassword([]byte("error_token_creation_failed"), []byte("error_token_creation_failed")).
+						Return(nil)
+				},
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "error_token_creation_failed",
+					Password: "error_token_creation_failed",
+				},
+			},
+			want:            dto.AuthResponse{},
+			wantErr:         true,
+			wantSpecificErr: nil,
 		},
 
 		{
-			"error_failed_to_hash_password",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(nil, nil),
-			mocks.NewToken(nil, nil, nil),
-			mocks.NewHasher(
-				func(data string, logger logging.Logger) ([]byte, error) {
-					return []byte{}, domain.ErrInternalServerError
+			name: "error_failed_to_hash_password",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage:    func(m *mocks.StorageAuth) {},
+				TokenMaker: func(m *mocks.TokenMaker) {},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("error_failed_to_hash_password", logger).
+						Return([]byte{}, errors.New("Some error"))
 				},
-				nil,
-			),
-			dto.AuthResponse{},
-			true,
-			domain.ErrInternalServerError,
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "error_failed_to_hash_password",
+					Password: "error_failed_to_hash_password",
+				},
+			},
+			want:            dto.AuthResponse{},
+			wantErr:         true,
+			wantSpecificErr: nil,
 		},
 
 		{
-			"error_failed_to_create_user",
-			dto.AuthRequest{Name: "test", Password: "test"},
-			mocks.NewStorageAuth(
-				func(ctx context.Context, username string) ([]byte, error) {
-					return nil, pgx.ErrNoRows
+			name: "error_failed_to_create_user",
+			fields: fields{
+				Storage:    storageMock,
+				Logger:     logger,
+				TokenMaker: tokenMaker,
+				Hasher:     hasherMock,
+			},
+			mockSetups: mockSetups{
+				Storage: func(m *mocks.StorageAuth) {
+					m.EXPECT().
+						GetHashedUserPassword(ctx, "error_failed_to_create_user").
+						Return([]byte{}, pgx.ErrNoRows)
+					m.EXPECT().
+						CreateUser(ctx, domain.HashedUserData{
+							Name:     "error_failed_to_create_user",
+							Password: []byte("error_failed_to_create_user"),
+						}).
+						Return([]byte{}, errors.New("Some error"))
 				},
-				func(ctx context.Context, user domain.HashedUserData) ([]byte, error) {
-					return nil, errors.New("test")
+				TokenMaker: func(m *mocks.TokenMaker) {},
+				Hasher: func(m *mocks.Hasher) {
+					m.EXPECT().
+						Hash("error_failed_to_create_user", logger).
+						Return([]byte("error_failed_to_create_user"), nil)
 				},
-			),
-			mocks.NewToken(nil, nil, nil),
-			mocks.NewHasher(nil, nil),
-			dto.AuthResponse{},
-			true,
-			nil,
+			},
+			args: args{
+				ctx: ctx,
+				data: dto.AuthRequest{
+					Name:     "error_failed_to_create_user",
+					Password: "error_failed_to_create_user",
+				},
+			},
+			want:            dto.AuthResponse{},
+			wantErr:         true,
+			wantSpecificErr: nil,
 		},
 	}
-
-	if err := config.Init("../../cmd/config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-
-	logger := mocks.NewLogger(nil)
-
-	for _, test := range tests {
-		TestAuthService := NewAuth(
-			test.mockStorage,
-			logger,
-			test.tokenMaker,
-			test.hasher,
-		)
-		ctx, cancel := context.WithTimeout(context.Background(), config.App.Storage.QueryTimeout)
-
-		result, err := TestAuthService.Auth(ctx, test.data)
-		cancel()
-
-		if err != nil {
-			if !test.wantErr {
-				t.Fatalf("Test %v, Auth() unexpected error: %v", test.name, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := auth{
+				Storage:    tt.fields.Storage,
+				Logger:     tt.fields.Logger,
+				TokenMaker: tt.fields.TokenMaker,
+				Hasher:     tt.fields.Hasher,
 			}
-			if test.wantSpecificErr != nil && !errors.Is(err, test.wantSpecificErr) {
-				t.Errorf("Test %v, Auth() = %+v, want %+v", test.name, err, test.wantSpecificErr)
+			tt.mockSetups.Storage(storageMock)
+			tt.mockSetups.Hasher(hasherMock)
+			tt.mockSetups.TokenMaker(tokenMaker)
+
+			got, err := s.Auth(tt.args.ctx, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Auth() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-		}
-
-		if result != test.expected {
-			t.Errorf("Test %v, Auth() = %+v, want %+v", test.name, result, test.expected)
-		} else {
-			t.Logf("Test %v, Auth() success: %+v", test.name, result)
-		}
+			if tt.wantSpecificErr != nil && !errors.Is(err, tt.wantSpecificErr) {
+				t.Errorf("GetUserInfo() error = %v, wantSpecificErr %v", err, tt.wantSpecificErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Auth() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
-
 }

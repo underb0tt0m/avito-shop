@@ -2,125 +2,150 @@ package handler
 
 import (
 	"avito-shop/cmd/dto"
-	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
 	"avito-shop/internal/mocks"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
+	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
-func TestAuth(t *testing.T) {
-	if err := config.Init("../config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	method := http.MethodPost
-	path := "/api/auth"
-	logger := mocks.NewLogger(nil)
-	jsonCodec := json.NewJSONCodec()
+//"successful", "error_unprocessable_entity", "error_from_service",
 
+func TestAuth_handleAuth(t *testing.T) {
+	path := "/auth"
+
+	logger := logging.LoggerNoop{}
+	jsonCodec := jsoncodec.NewJSONCodec("sonic")
+	queryTimeout := time.Second
+
+	type fields struct {
+		logger       logging.Logger
+		jsonCodec    jsoncodec.JSONCodec
+		queryTimeout time.Duration
+	}
+	testFields := fields{
+		logger:       logger,
+		jsonCodec:    jsonCodec,
+		queryTimeout: queryTimeout,
+	}
+	type mockSetups struct {
+		service func(m *mocks.ServiceAuth)
+	}
 	tests := []struct {
 		name           string
-		body           any
+		fields         fields
+		mockSetups     mockSetups
+		requestBody    any
 		expectedStatus int
-		expectedBody   any
-		serviceSetup   func(s *mocks.MockServiceAuth)
+		expectedBody   dto.Response
 	}{
 		{
-			"successful",
-			dto.AuthRequest{
+			name:   "successful",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAuth) {
+					m.EXPECT().
+						Auth(gomock.Any(), gomock.Any()).
+						Return(dto.AuthResponse{Token: "token"}, nil)
+				},
+			},
+			requestBody: dto.AuthRequest{
 				Name:     "test",
 				Password: "test",
 			},
-			http.StatusOK,
-			dto.AuthResponse{Token: "test"},
-			func(s *mocks.MockServiceAuth) {
-				s.EXPECT().
-					Auth(gomock.Any(), gomock.Any()).
-					Return(dto.AuthResponse{Token: "test"}, nil)
+			expectedStatus: http.StatusOK,
+			expectedBody:   dto.AuthResponse{Token: "token"},
+		},
+
+		{
+			name:   "error_unprocessable_entity",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAuth) {},
 			},
+			requestBody:    `bimbim: "bambam"`,
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrUnprocessableEntity.Message},
 		},
 
 		{
-			"error_unprocessable_entity",
-			`name`,
-			domain.ErrUnprocessableEntity.Code,
-			dto.ErrorResponse{Errors: domain.ErrUnprocessableEntity.Message},
-			func(s *mocks.MockServiceAuth) {},
-		},
-
-		{
-			"error_from_service",
-			dto.AuthRequest{
+			name:   "error_from_service",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAuth) {
+					m.EXPECT().
+						Auth(gomock.Any(), gomock.Any()).
+						Return(dto.AuthResponse{}, errors.New("Some error"))
+				},
+			},
+			requestBody: dto.AuthRequest{
 				Name:     "test",
 				Password: "test",
 			},
-			domain.ErrUnauthorized.Code,
-			dto.ErrorResponse{Errors: domain.ErrUnauthorized.Message},
-			func(s *mocks.MockServiceAuth) {
-				s.EXPECT().
-					Auth(gomock.Any(), gomock.Any()).
-					Return(dto.AuthResponse{}, domain.ErrUnauthorized)
-			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrInternalServerError.Message},
 		},
 	}
-	t.Logf("\n\n")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var body bytes.Buffer
-			if err := json.NewEncoder(&body).Encode(tt.body); err != nil {
-				t.Fatalf("Failed to encode request body: %v", err)
-			}
-			req := httptest.NewRequest(method, path, &body)
-
-			rr := httptest.NewRecorder()
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			serviceAuth := mocks.NewMockServiceAuth(ctrl)
-			tt.serviceSetup(serviceAuth)
+			serviceMock := mocks.NewServiceAuth(ctrl)
+			tt.mockSetups.service(serviceMock)
 
-			router := chi.NewRouter()
-			router.Route("/api", func(r chi.Router) {
-				Auth(serviceAuth, r, logger, jsonCodec)
-			})
+			var body bytes.Buffer
+			_ = json.NewEncoder(&body).Encode(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPost, path, &body)
+			rr := httptest.NewRecorder()
 
-			router.ServeHTTP(rr, req)
-
-			if rr.Code != tt.expectedStatus {
-				t.Fatalf("expected %v, got %v", tt.expectedStatus, rr.Code)
+			h := Auth{
+				service:      serviceMock,
+				logger:       tt.fields.logger,
+				jsonCodec:    tt.fields.jsonCodec,
+				queryTimeout: tt.fields.queryTimeout,
 			}
+			h.handleAuth(rr, req)
 
-			switch expected := tt.expectedBody.(type) {
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			switch tt.expectedBody.(type) {
 			case dto.AuthResponse:
-				var got dto.AuthResponse
-				if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-					t.Fatalf("failed to unmarshal info response: %v; body=%s", err, rr.Body.String())
+				var body dto.AuthResponse
+				if err := jsonCodec.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+					t.Fatalf(
+						"failed to unmarshal body. expected: %+v, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
-				if !reflect.DeepEqual(got, expected) {
-					t.Fatalf("expected body %+v, got %+v", expected, got)
-				}
-
+				assert.Equal(t, tt.expectedBody, body)
 			case dto.ErrorResponse:
-				var got dto.ErrorResponse
-				if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-					t.Fatalf("failed to unmarshal error response: %v; body=%s", err, rr.Body.String())
+				var body dto.ErrorResponse
+				if err := jsonCodec.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+					t.Fatalf(
+						"unexpected body scheme. expected: %t, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
-				if !reflect.DeepEqual(got, expected) {
-					t.Fatalf("expected body %+v, got %+v", expected, got)
-				}
-
+				assert.Equal(t, tt.expectedBody, body)
 			default:
-				t.Fatalf("unsupported expectedBody type %T", tt.expectedBody)
+				t.Fatalf(
+					"unexpected body scheme. expected: %t, got: %s",
+					tt.expectedBody,
+					rr.Body.String(),
+				)
 			}
-			t.Logf("subtest %s passed, status: %v, body: %s", tt.name, rr.Code, rr.Body.String())
 		})
 	}
 }

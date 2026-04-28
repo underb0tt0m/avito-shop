@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-//go:generate mockgen -source=auth.go -destination=../mocks/service_auth.go -package=mocks -mock_names=Auth=MockServiceAuth
+//go:generate mockgen -source=auth.go -destination=../mocks/service_auth.go -package=mocks -mock_names=Auth=ServiceAuth
 type Auth interface {
 	Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse, error)
 }
