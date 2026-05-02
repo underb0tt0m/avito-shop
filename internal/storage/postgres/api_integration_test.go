@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -53,6 +54,11 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Short() {
+		os.Exit(0)
+	}
+
 	cfg, err := config.Load("../../../cmd/config.yaml")
 	if err != nil {
 		log.Fatal(errors.Join(
@@ -576,6 +582,9 @@ func truncateTables() error {
 
 	defer func() {
 		if err = tx.Rollback(testCtx); err != nil {
+			if errors.Is(err, pgx.ErrTxClosed) {
+				return
+			}
 			panic(errors.Join(errors.New("failed to truncate table: "),
 				err),
 			)

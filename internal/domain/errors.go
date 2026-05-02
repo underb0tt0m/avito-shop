@@ -59,23 +59,27 @@ var (
 
 func WriteError(w http.ResponseWriter, err error, logger logging.Logger) {
 	if apiErr, ok := errors.AsType[APIErr](err); ok {
+		w.WriteHeader(apiErr.Code)
 		response, marshalErr := json.Marshal(dto.ErrorResponse{Errors: apiErr.Message})
 		if marshalErr != nil {
 			logger.Errorf(err, "failed to marshal request body: %v", err)
+			return
 		}
-		w.WriteHeader(apiErr.Code)
 		if _, err = w.Write(response); err != nil {
 			logger.Errorf(err, "failed to write request body: %v", err)
+			return
 		}
-
+		return
 	}
+	w.WriteHeader(ErrInternalServerError.Code)
 	response, err := json.Marshal(dto.ErrorResponse{Errors: ErrInternalServerError.Message})
 	if err != nil {
 		logger.Errorf(err, "failed to marshal response body")
+		return
 	}
-	w.WriteHeader(ErrInternalServerError.Code)
 	_, err = w.Write(response)
 	if err != nil {
 		logger.Errorf(err, "failed to write response body")
+		return
 	}
 }
