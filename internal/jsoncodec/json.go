@@ -8,8 +8,8 @@ import (
 
 type JSONCodec interface {
 	Marshal(data any) ([]byte, error)
-	MarshalIndent(v interface{}, prefix, indent string) ([]byte, error)
-	Unmarshal(buf []byte, val interface{}) error
+	MarshalIndent(v any, prefix, indent string) ([]byte, error)
+	Unmarshal(buf []byte, val any) error
 }
 
 func NewJSONCodec(codecType string) JSONCodec {
@@ -23,14 +23,14 @@ func NewJSONCodec(codecType string) JSONCodec {
 
 type jsonGo struct{}
 
-func (j jsonGo) Marshal(data any) ([]byte, error) {
+func (jsonGo) Marshal(data any) ([]byte, error) {
 	return json.Marshal(data)
 }
 
-func (j jsonGo) MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+func (jsonGo) MarshalIndent(v any, prefix, indent string) ([]byte, error) {
 	return json.MarshalIndent(v, prefix, indent)
 }
 
-func (j jsonGo) Unmarshal(buf []byte, val interface{}) error {
+func (jsonGo) Unmarshal(buf []byte, val any) error {
 	return json.Unmarshal(buf, val)
 }

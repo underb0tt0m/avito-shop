@@ -1,12 +1,13 @@
 package postgres
 
 import (
+	"context"
+	"errors"
+
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
 	"avito-shop/internal/storage/views"
-	"context"
-	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -162,7 +163,11 @@ WHERE u1.name = $2 AND u2.name = $3;
 		)
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil {
+			s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+		}
+	}()
 
 	cmd1, err := tx.Exec(
 		ctx,
@@ -252,7 +257,11 @@ func (s storageAPI) BuyItem(ctx context.Context, itemID int, user string) error 
 		)
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil {
+			s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+		}
+	}()
 
 	selectStmt := `
 SELECT price

@@ -1,10 +1,11 @@
 package postgres
 
 import (
+	"context"
+
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
-	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

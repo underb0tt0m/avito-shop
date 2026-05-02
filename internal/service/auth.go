@@ -1,15 +1,16 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/hasher"
 	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
-	"context"
-	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )

@@ -8,8 +8,7 @@ import (
 	"avito-shop/internal/jsoncodec"
 	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
-	"avito-shop/internal/service"
-	"avito-shop/internal/storage/postgres"
+
 	"context"
 	"errors"
 	"fmt"
@@ -20,6 +19,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"avito-shop/internal/service"
+	"avito-shop/internal/storage/postgres"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,7 +47,9 @@ func main() {
 		log.Fatalf("failed create logger: %v", err)
 	}
 	defer func() {
-		_ = logger.Sync()
+		if err = logger.Sync(); err != nil {
+			logger.Errorf(err, "failed to sync logger: %v", err)
+		}
 		if err = closeLogger(); err != nil {
 			logger.Fatalf(err, "failed to close log file: %v", err)
 		}

@@ -1,14 +1,15 @@
 package api_middleware
 
 import (
-	"avito-shop/internal/domain"
-	"avito-shop/internal/jwtmanager"
-	"avito-shop/internal/logging"
 	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
+
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jwtmanager"
+	"avito-shop/internal/logging"
 )
 
 func Stopwatch(logger logging.Logger) func(handler http.Handler) http.Handler {
@@ -37,7 +38,7 @@ func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker) func(handler 
 					domain.ErrUnauthorized,
 					"user unauthorized",
 				)
-				domain.WriteError(w, domain.ErrUnauthorized)
+				domain.WriteError(w, domain.ErrUnauthorized, logger)
 				return
 			}
 			token, ok := strings.CutPrefix(token, tokenMaker.GetPrefix())
@@ -46,13 +47,13 @@ func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker) func(handler 
 					domain.ErrInvalidToken,
 					"Token without prefix",
 				)
-				domain.WriteError(w, domain.ErrInvalidToken)
+				domain.WriteError(w, domain.ErrInvalidToken, logger)
 				return
 			}
 			token = strings.TrimSpace(token)
 			jsonBytes, err := tokenMaker.ParseUserTokenRaw(token)
 			if err != nil {
-				domain.WriteError(w, err)
+				domain.WriteError(w, err, logger)
 				return
 			}
 			var claims domain.DefaultUser
@@ -64,7 +65,7 @@ func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker) func(handler 
 					err,
 					"failed to unmarshal token",
 				)
-				domain.WriteError(w, domain.ErrBadRequest)
+				domain.WriteError(w, domain.ErrBadRequest, logger)
 				return
 			}
 
@@ -73,7 +74,7 @@ func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker) func(handler 
 					domain.ErrTokenExpired,
 					"token is expired",
 				)
-				domain.WriteError(w, domain.ErrTokenExpired)
+				domain.WriteError(w, domain.ErrTokenExpired, logger)
 				return
 			}
 

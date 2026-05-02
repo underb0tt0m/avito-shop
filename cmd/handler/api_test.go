@@ -1,11 +1,6 @@
 package handler
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/jsoncodec"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/mocks"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -14,6 +9,12 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/mocks"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,7 @@ func TestMain_handleInfo(t *testing.T) {
 						GetUserInfo(gomock.Any(), "successful").
 						Return(&dto.InfoResponse{}, nil)
 				},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        true,
 			expectedStatus: http.StatusOK,
@@ -75,8 +76,8 @@ func TestMain_handleInfo(t *testing.T) {
 			name:   "error_unauthorised",
 			fields: testFields,
 			mockSetups: mockSetups{
-				service:    func(m *mocks.ServiceAPI) {},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        false,
 			expectedStatus: http.StatusUnauthorized,
@@ -92,7 +93,7 @@ func TestMain_handleInfo(t *testing.T) {
 						GetUserInfo(gomock.Any(), "any_error_from_service").
 						Return(&dto.InfoResponse{}, errors.New("Some error"))
 				},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        true,
 			expectedStatus: http.StatusInternalServerError,
@@ -173,10 +174,6 @@ func TestMain_handleSendCoin(t *testing.T) {
 		jsonCodec    jsoncodec.JSONCodec
 		queryTimeout time.Duration
 	}
-	type args struct {
-		w http.ResponseWriter
-		r *http.Request
-	}
 	testFields := fields{
 		logger:       logger,
 		jsonCodec:    jsonCodec,
@@ -204,7 +201,7 @@ func TestMain_handleSendCoin(t *testing.T) {
 						SendCoins(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(nil)
 				},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx: true,
 			requestBody: dto.SendCoinRequest{
@@ -219,8 +216,8 @@ func TestMain_handleSendCoin(t *testing.T) {
 			name:   "error_unauthorized",
 			fields: testFields,
 			mockSetups: mockSetups{
-				service:    func(m *mocks.ServiceAPI) {},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx: false,
 			requestBody: dto.SendCoinRequest{
@@ -240,7 +237,7 @@ func TestMain_handleSendCoin(t *testing.T) {
 						SendCoins(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(errors.New("Some error"))
 				},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx: true,
 			requestBody: dto.SendCoinRequest{
@@ -255,8 +252,8 @@ func TestMain_handleSendCoin(t *testing.T) {
 			name:   "error_unprocessable_entity",
 			fields: testFields,
 			mockSetups: mockSetups{
-				service:    func(m *mocks.ServiceAPI) {},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        true,
 			requestBody:    `{bimbim: "bambam"}`,
@@ -277,7 +274,9 @@ func TestMain_handleSendCoin(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			var body bytes.Buffer
-			_ = json.NewEncoder(&body).Encode(tt.requestBody)
+			if err := json.NewEncoder(&body).Encode(tt.requestBody); err != nil {
+				t.Fatalf("failed to encode test body: %v", err)
+			}
 			req := httptest.NewRequest(http.MethodPost, path, &body)
 			if tt.withCtx {
 				ctx := context.WithValue(req.Context(), domain.UserContextKey, domain.DefaultUser{UserName: tt.name})
@@ -365,7 +364,7 @@ func TestMain_handleBuyItem(t *testing.T) {
 						BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(nil)
 				},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        true,
 			itemID:         "1",
@@ -377,8 +376,8 @@ func TestMain_handleBuyItem(t *testing.T) {
 			name:   "error_unauthorised",
 			fields: testFields,
 			mockSetups: mockSetups{
-				service:    func(m *mocks.ServiceAPI) {},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        false,
 			itemID:         "1",
@@ -390,8 +389,8 @@ func TestMain_handleBuyItem(t *testing.T) {
 			name:   "error_bad_itemID",
 			fields: testFields,
 			mockSetups: mockSetups{
-				service:    func(m *mocks.ServiceAPI) {},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        true,
 			itemID:         "hehmda",
@@ -408,7 +407,7 @@ func TestMain_handleBuyItem(t *testing.T) {
 						BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(errors.New("Some error"))
 				},
-				tokenMaker: func(m *mocks.TokenMaker) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
 			withCtx:        true,
 			itemID:         "1",

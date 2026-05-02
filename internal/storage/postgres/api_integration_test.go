@@ -1,10 +1,6 @@
 package postgres
 
 import (
-	"avito-shop/internal/config"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/storage/views"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -14,6 +10,11 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"avito-shop/internal/config"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/storage/views"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -68,7 +69,13 @@ func TestMain(m *testing.M) {
 			errors.New("failed to create network: "),
 			err))
 	}
-	defer testNetwork.Remove(testCtx)
+	defer func() {
+		if err = testNetwork.Remove(testCtx); err != nil {
+			panic(errors.Join(
+				errors.New("failed to remove container: "),
+				err))
+		}
+	}()
 
 	dbImg := cfg.Storage.Type + ":" + cfg.Storage.Version
 	dbEnvs := map[string]string{
@@ -277,7 +284,12 @@ func TestMain(m *testing.M) {
 		},
 	}
 
-	mappedPort, _ := postgresC.MappedPort(testCtx, cfg.Storage.Connection.Port)
+	mappedPort, err := postgresC.MappedPort(testCtx, cfg.Storage.Connection.Port)
+	if err != nil {
+		panic(errors.Join(
+			errors.New("failed to get mapped port: "),
+			err))
+	}
 	cfg.Storage.Connection.Port = mappedPort.Port()
 	cfg.Storage.Connection.User = "postgres"
 	cfg.Storage.Connection.Password = "postgres"
@@ -375,7 +387,7 @@ func TestGetUserInfo(t *testing.T) {
 				}
 			}
 
-			if tt.wantErr == true {
+			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("unhandled error %+v", tt.wantErr)
 				}
@@ -448,8 +460,8 @@ func TestSendCoins(t *testing.T) {
 				t.Fatalf("failed to truncate tables: %v", err)
 			}
 
-			beforeFromBalance, checkBalanceErr := checkBalance(tt.fromUser)
-			beforeToBalance, checkBalanceErr := checkBalance(tt.transaction.ToUser)
+			beforeFromBalance, checkSenderBalanceErr := checkBalance(tt.fromUser)
+			beforeToBalance, checkRecipientBalanceErr := checkBalance(tt.transaction.ToUser)
 
 			testStorage := NewStorageAPI(testPool, testLogger)
 			queryCtx, cancel := context.WithTimeout(testCtx, Cfg.Storage.QueryTimeout)
@@ -471,9 +483,15 @@ func TestSendCoins(t *testing.T) {
 				}
 			}
 
-			if checkBalanceErr == nil && tt.err == nil {
-				afterFromBalance, _ := checkBalance(tt.fromUser)
-				afterToBalance, _ := checkBalance(tt.transaction.ToUser)
+			if checkSenderBalanceErr == nil && checkRecipientBalanceErr == nil && tt.err == nil {
+				afterFromBalance, err := checkBalance(tt.fromUser)
+				if err != nil {
+					t.Fatalf("failed to get balance after operation")
+				}
+				afterToBalance, err := checkBalance(tt.transaction.ToUser)
+				if err != nil {
+					t.Fatalf("failed to get balance after operation")
+				}
 				if afterFromBalance != beforeFromBalance-tt.transaction.Amount {
 					t.Fatalf("expected balance %d, got %d", beforeFromBalance-tt.transaction.Amount, afterFromBalance)
 				}
@@ -555,7 +573,14 @@ func truncateTables() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(testCtx)
+
+	defer func() {
+		if err = tx.Rollback(testCtx); err != nil {
+			panic(errors.Join(errors.New("failed to truncate table: "),
+				err),
+			)
+		}
+	}()
 
 	if _, err = tx.Exec(
 		testCtx,

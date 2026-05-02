@@ -1,10 +1,12 @@
 package domain
 
 import (
-	"avito-shop/cmd/dto"
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/logging"
 )
 
 type APIErr struct {
@@ -55,15 +57,25 @@ var (
 	}
 )
 
-func WriteError(w http.ResponseWriter, err error) {
+func WriteError(w http.ResponseWriter, err error, logger logging.Logger) {
 	if apiErr, ok := errors.AsType[APIErr](err); ok {
-		response, _ := json.Marshal(dto.ErrorResponse{Errors: apiErr.Message})
+		response, marshalErr := json.Marshal(dto.ErrorResponse{Errors: apiErr.Message})
+		if marshalErr != nil {
+			logger.Errorf(err, "failed to marshal request body: %v", err)
+		}
 		w.WriteHeader(apiErr.Code)
-		_, _ = w.Write(response)
-		return
+		if _, err = w.Write(response); err != nil {
+			logger.Errorf(err, "failed to write request body: %v", err)
+		}
+
 	}
-	response, _ := json.Marshal(dto.ErrorResponse{Errors: ErrInternalServerError.Message})
+	response, err := json.Marshal(dto.ErrorResponse{Errors: ErrInternalServerError.Message})
+	if err != nil {
+		logger.Errorf(err, "failed to marshal response body")
+	}
 	w.WriteHeader(ErrInternalServerError.Code)
-	_, _ = w.Write(response)
-	return
+	_, err = w.Write(response)
+	if err != nil {
+		logger.Errorf(err, "failed to write response body")
+	}
 }

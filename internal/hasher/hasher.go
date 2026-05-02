@@ -34,6 +34,6 @@ func (h bcryptHasher) Hash(data string, logger logging.Logger) ([]byte, error) {
 	return hashedData, nil
 }
 
-func (h bcryptHasher) CompareHashAndPassword(hashedPassword []byte, password []byte) error {
+func (bcryptHasher) CompareHashAndPassword(hashedPassword, password []byte) error {
 	return bcrypt.CompareHashAndPassword(hashedPassword, password)
 }

@@ -1,15 +1,16 @@
 package handler
 
 import (
+	"context"
+	"io"
+	"net/http"
+	"time"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/jsoncodec"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/service"
-	"context"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -22,13 +23,13 @@ type Auth struct {
 }
 
 func NewAuth(
-	service service.Auth,
+	authService service.Auth,
 	logger logging.Logger,
 	jsonCodec jsoncodec.JSONCodec,
 	queryTimeout time.Duration,
 ) Auth {
 	return Auth{
-		service:      service,
+		service:      authService,
 		logger:       logger,
 		jsonCodec:    jsonCodec,
 		queryTimeout: queryTimeout,
@@ -45,13 +46,20 @@ func (h Auth) Auth(r chi.Router) {
 
 func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 	requestBody, err := io.ReadAll(r.Body)
-	defer func() { _ = r.Body.Close() }()
+	defer func() {
+		if err = r.Body.Close(); err != nil {
+			h.logger.Errorf(
+				err,
+				"failed to close auth request body",
+			)
+		}
+	}()
 	if err != nil {
 		h.logger.Errorf(
 			err,
 			"failed to read auth request body",
 		)
-		domain.WriteError(w, err)
+		domain.WriteError(w, err, h.logger)
 		return
 	}
 
@@ -64,7 +72,7 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to unmarshal auth request body",
 		)
-		domain.WriteError(w, domain.ErrUnprocessableEntity)
+		domain.WriteError(w, domain.ErrUnprocessableEntity, h.logger)
 		return
 	}
 
@@ -81,7 +89,7 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 			"authentication denied, username: %v",
 			user.Name,
 		)
-		domain.WriteError(w, err)
+		domain.WriteError(w, err, h.logger)
 		return
 	}
 
@@ -91,7 +99,7 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to marshal auth response body",
 		)
-		domain.WriteError(w, err)
+		domain.WriteError(w, err, h.logger)
 		return
 	}
 
@@ -100,7 +108,7 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to write auth response",
 		)
-		domain.WriteError(w, err)
+		domain.WriteError(w, err, h.logger)
 		return
 	}
 }

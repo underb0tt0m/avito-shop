@@ -1,13 +1,6 @@
 package service
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/hasher"
-	"avito-shop/internal/jwtmanager"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/mocks"
-	"avito-shop/internal/storage"
 	"context"
 	"errors"
 	"reflect"
@@ -15,6 +8,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/mock/gomock"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/hasher"
+	"avito-shop/internal/jwtmanager"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/mocks"
+	"avito-shop/internal/storage"
 )
 
 func Test_auth_Auth(t *testing.T) {
@@ -105,7 +106,7 @@ func Test_auth_Auth(t *testing.T) {
 						GetHashedUserPassword(ctx, "error_wrong_password").
 						Return([]byte("error_wrong_password"), nil)
 				},
-				TokenMaker: func(m *mocks.TokenMaker) {},
+				TokenMaker: func(_ *mocks.TokenMaker) {},
 				Hasher: func(m *mocks.Hasher) {
 					m.EXPECT().
 						Hash("bimbimbambam", logger).
@@ -187,7 +188,7 @@ func Test_auth_Auth(t *testing.T) {
 						GetHashedUserPassword(ctx, "error_database_unavailable_on_get").
 						Return([]byte{}, errors.New("Some error"))
 				},
-				TokenMaker: func(m *mocks.TokenMaker) {},
+				TokenMaker: func(_ *mocks.TokenMaker) {},
 				Hasher: func(m *mocks.Hasher) {
 					m.EXPECT().
 						Hash("error_database_unavailable_on_get", logger).
@@ -255,8 +256,8 @@ func Test_auth_Auth(t *testing.T) {
 				Hasher:     hasherMock,
 			},
 			mockSetups: mockSetups{
-				Storage:    func(m *mocks.StorageAuth) {},
-				TokenMaker: func(m *mocks.TokenMaker) {},
+				Storage:    func(_ *mocks.StorageAuth) {},
+				TokenMaker: func(_ *mocks.TokenMaker) {},
 				Hasher: func(m *mocks.Hasher) {
 					m.EXPECT().
 						Hash("error_failed_to_hash_password", logger).
@@ -295,7 +296,7 @@ func Test_auth_Auth(t *testing.T) {
 						}).
 						Return([]byte{}, errors.New("Some error"))
 				},
-				TokenMaker: func(m *mocks.TokenMaker) {},
+				TokenMaker: func(_ *mocks.TokenMaker) {},
 				Hasher: func(m *mocks.Hasher) {
 					m.EXPECT().
 						Hash("error_failed_to_create_user", logger).

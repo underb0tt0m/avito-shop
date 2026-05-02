@@ -1,12 +1,13 @@
 package service
 
 import (
+	"context"
+	"errors"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/storage"
-	"context"
-	"errors"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -131,15 +132,11 @@ func (s api) SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoin
 		ToUser: toUser.ToUser,
 		Amount: toUser.Amount,
 	}
-	if err := s.Storage.SendCoins(
+	return s.Storage.SendCoins(
 		ctx,
 		fromUser,
 		transaction,
-	); err != nil {
-		return err
-	}
-
-	return nil
+	)
 }
 
 func (s api) BuyItem(ctx context.Context, itemID int, user string) error {

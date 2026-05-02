@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ type Logger interface {
 	Sync() error
 }
 
-func New(realisation string, serverType string, logLvl string) (Logger, func() error, error) {
+func New(realisation, serverType, logLvl string) (Logger, func() error, error) {
 	switch realisation {
 	case "zap_logging":
 		return newZap(serverType, logLvl)
@@ -71,14 +72,11 @@ func (l loggerZap) Fatalf(err error, msg string, v ...any) {
 }
 
 func (l loggerZap) Sync() error {
-	if err := l.Logger.Sync(); err != nil {
-		return err
-	}
-	return nil
+	return l.Logger.Sync()
 }
 
-func newZap(serverType string, logLvl string) (Logger, func() error, error) {
-	if err := os.MkdirAll("logs", 755); err != nil {
+func newZap(serverType, logLvl string) (Logger, func() error, error) {
+	if err := os.MkdirAll("logs", 0755); err != nil {
 		return nil, nil, err
 	}
 
@@ -96,7 +94,7 @@ func newZap(serverType string, logLvl string) (Logger, func() error, error) {
 	case "production":
 		encoderCfg = zap.NewProductionEncoderConfig()
 	default:
-		err = fmt.Errorf("there is no server type in the configuration")
+		err = errors.New("there is no server type in the configuration")
 		return nil, nil, err
 	}
 	encoderCfg.TimeKey = "timestamp"
@@ -112,7 +110,7 @@ func newZap(serverType string, logLvl string) (Logger, func() error, error) {
 	case "warn":
 		level = 1
 	default:
-		err = fmt.Errorf("there is no logging level in the configuration")
+		err = errors.New("there is no logging level in the configuration")
 		return nil, nil, err
 	}
 
@@ -133,16 +131,16 @@ func newZap(serverType string, logLvl string) (Logger, func() error, error) {
 
 type LoggerNoop struct{}
 
-func (l LoggerNoop) Debugf(msg string, v ...any) {}
+func (LoggerNoop) Debugf(_ string, _ ...any) {}
 
-func (l LoggerNoop) Infof(msg string, v ...any) {}
+func (LoggerNoop) Infof(_ string, _ ...any) {}
 
-func (l LoggerNoop) Warnf(err error, msg string, v ...any) {}
+func (LoggerNoop) Warnf(_ error, _ string, _ ...any) {}
 
-func (l LoggerNoop) Errorf(err error, msg string, v ...any) {}
+func (LoggerNoop) Errorf(_ error, _ string, _ ...any) {}
 
-func (l LoggerNoop) Fatalf(err error, msg string, v ...any) {}
+func (LoggerNoop) Fatalf(_ error, _ string, _ ...any) {}
 
-func (l LoggerNoop) Sync() error {
+func (LoggerNoop) Sync() error {
 	return nil
 }

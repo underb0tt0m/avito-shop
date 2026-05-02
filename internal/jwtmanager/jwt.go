@@ -1,10 +1,11 @@
 package jwtmanager
 
 import (
-	"avito-shop/internal/domain"
-	jsoncodec "avito-shop/internal/jsoncodec"
-	"avito-shop/internal/logging"
 	"time"
+
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -25,6 +26,7 @@ type jwtTokenMaker struct {
 	secret      []byte
 }
 
+//nolint:revive
 func NewToken(
 	logger logging.Logger,
 	jsonCodec jsoncodec.JSONCodec,
@@ -124,7 +126,7 @@ func (t jwtTokenMaker) GetPrefix() string {
 }
 
 func createKeyFunc(logger logging.Logger, secret []byte) jwt.Keyfunc {
-	return func(token *jwt.Token) (interface{}, error) {
+	return func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			logger.Errorf(
 				domain.ErrWrongSigningMethod,

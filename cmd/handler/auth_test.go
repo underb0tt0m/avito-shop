@@ -1,11 +1,6 @@
 package handler
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/jsoncodec"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/mocks"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -13,6 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -70,7 +71,7 @@ func TestAuth_handleAuth(t *testing.T) {
 			name:   "error_unprocessable_entity",
 			fields: testFields,
 			mockSetups: mockSetups{
-				service: func(m *mocks.ServiceAuth) {},
+				service: func(_ *mocks.ServiceAuth) {},
 			},
 			requestBody:    `bimbim: "bambam"`,
 			expectedStatus: http.StatusUnprocessableEntity,
@@ -104,7 +105,9 @@ func TestAuth_handleAuth(t *testing.T) {
 			tt.mockSetups.service(serviceMock)
 
 			var body bytes.Buffer
-			_ = json.NewEncoder(&body).Encode(tt.requestBody)
+			if err := json.NewEncoder(&body).Encode(tt.requestBody); err != nil {
+				t.Fatalf("failed to encode test body: %v", err)
+			}
 			req := httptest.NewRequest(http.MethodPost, path, &body)
 			rr := httptest.NewRecorder()
 

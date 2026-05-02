@@ -1,16 +1,17 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"reflect"
+	"testing"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/mocks"
 	"avito-shop/internal/storage"
 	"avito-shop/internal/storage/views"
-	"context"
-	"errors"
-	"reflect"
-	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/mock/gomock"
