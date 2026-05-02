@@ -1,7 +1,6 @@
 version: "2"
 
 linters:
-  fast: true
   default: none
   enable:
     - errcheck
