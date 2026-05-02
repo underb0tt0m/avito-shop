@@ -1,36 +1,54 @@
-package tools
+package jwtmanager
 
 import (
-	"avito-shop/internal/config"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/logging"
-	"fmt"
 	"time"
+
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
+//go:generate mockgen -source=jwt.go -destination=../mocks/jwt.go -package=mocks -mock_names=TokenMaker=TokenMaker
 type TokenMaker interface {
 	CreateToken(data any) (string, error)
 	ValidateUserToken(tokenString string) error
 	ParseUserTokenRaw(tokenString string) ([]byte, error)
+	GetPrefix() string
 }
 
 type jwtTokenMaker struct {
-	logger    logging.Logger
-	jsonCodec JSONCodec
+	logger      logging.Logger
+	jsonCodec   jsoncodec.JSONCodec
+	tokenPrefix string
+	lifetime    time.Duration
+	secret      []byte
 }
 
-func NewToken(logger logging.Logger, jsonCodec JSONCodec) TokenMaker {
-	return jwtTokenMaker{logger, jsonCodec}
+//nolint:revive
+func NewToken(
+	logger logging.Logger,
+	jsonCodec jsoncodec.JSONCodec,
+	tokenPrefix string,
+	lifetime time.Duration,
+	secret []byte,
+) TokenMaker {
+	return jwtTokenMaker{
+		logger:      logger,
+		jsonCodec:   jsonCodec,
+		tokenPrefix: tokenPrefix,
+		lifetime:    lifetime,
+		secret:      secret,
+	}
 }
 
 func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	jsonBytes, err := t.jsonCodec.Marshal(data)
 	if err != nil {
-		t.logger.Error(
-			"failed to marshal token data",
+		t.logger.Errorf(
 			err,
+			"failed to marshal token data",
 		)
 		return "", err
 	}
@@ -40,23 +58,23 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 		jsonBytes,
 		&mapClaims,
 	); err != nil {
-		t.logger.Error(
-			"failed to unmarshal token data",
+		t.logger.Errorf(
 			err,
+			"failed to unmarshal token data",
 		)
 		return "", err
 	}
 
-	mapClaims["exp"] = jwt.NewNumericDate(time.Now().Add(config.App.Security.JWTToken.Lifetime))
+	mapClaims["exp"] = jwt.NewNumericDate(time.Now().Add(t.lifetime))
 	mapClaims["iat"] = jwt.NewNumericDate(time.Now())
 	mapClaims["iss"] = "app"
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mapClaims)
-	tokenString, err := token.SignedString(config.App.Security.JWTToken.SecretKey)
+	tokenString, err := token.SignedString(t.secret)
 	if err != nil {
-		t.logger.Error(
-			"failed to sign token",
+		t.logger.Errorf(
 			err,
+			"failed to sign token",
 		)
 		return "", err
 	}
@@ -64,11 +82,11 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 }
 
 func (t jwtTokenMaker) ValidateUserToken(tokenString string) error {
-	_, err := jwt.Parse(tokenString, createKeyFunc(t.logger))
+	_, err := jwt.Parse(tokenString, createKeyFunc(t.logger, t.secret))
 	if err != nil {
-		t.logger.Error(
-			"invalid token",
+		t.logger.Errorf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return domain.ErrInvalidToken
 	}
@@ -76,45 +94,47 @@ func (t jwtTokenMaker) ValidateUserToken(tokenString string) error {
 }
 
 func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string) ([]byte, error) {
-	token, err := jwt.Parse(tokenString, createKeyFunc(t.logger))
+	token, err := jwt.Parse(tokenString, createKeyFunc(t.logger, t.secret))
 	if err != nil {
-		t.logger.Warn(
-			"invalid token",
+		t.logger.Warnf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
 	if !token.Valid {
-		t.logger.Warn(
-			"invalid token",
+		t.logger.Warnf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		t.logger.Warn(
-			"invalid token",
+		t.logger.Warnf(
 			domain.ErrInvalidToken,
+			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
 	return t.jsonCodec.Marshal(claims)
 }
 
-func createKeyFunc(logger logging.Logger) jwt.Keyfunc {
-	return func(token *jwt.Token) (interface{}, error) {
+func (t jwtTokenMaker) GetPrefix() string {
+	return t.tokenPrefix
+}
+
+func createKeyFunc(logger logging.Logger, secret []byte) jwt.Keyfunc {
+	return func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			logger.Error(
-				fmt.Sprintf(
-					"unexpected signing method: %v",
-					token.Header["alg"],
-				),
+			logger.Errorf(
 				domain.ErrWrongSigningMethod,
+				"unexpected signing method: %v",
+				token.Header["alg"],
 			)
 			return nil, domain.ErrWrongSigningMethod
 		}
-		return config.App.Security.JWTToken.SecretKey, nil
+		return secret, nil
 	}
 }

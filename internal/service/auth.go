@@ -1,19 +1,21 @@
 package service
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/storage"
-	"avito-shop/internal/tools"
 	"context"
 	"errors"
 	"fmt"
 
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/hasher"
+	"avito-shop/internal/jwtmanager"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/storage"
+
 	"github.com/jackc/pgx/v5"
 )
 
-//go:generate mockgen -source=auth.go -destination=../mocks/service_auth.go -package=mocks -mock_names=Auth=MockServiceAuth
+//go:generate mockgen -source=auth.go -destination=../mocks/service_auth.go -package=mocks -mock_names=Auth=ServiceAuth
 type Auth interface {
 	Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse, error)
 }
@@ -21,11 +23,11 @@ type Auth interface {
 type auth struct {
 	Storage    storage.Auth
 	Logger     logging.Logger
-	TokenMaker tools.TokenMaker
-	Hasher     tools.Hasher
+	TokenMaker jwtmanager.TokenMaker
+	Hasher     hasher.Hasher
 }
 
-func NewAuth(s storage.Auth, l logging.Logger, t tools.TokenMaker, h tools.Hasher) Auth {
+func NewAuth(s storage.Auth, l logging.Logger, t jwtmanager.TokenMaker, h hasher.Hasher) Auth {
 	return auth{
 		Storage:    s,
 		Logger:     l,
@@ -54,7 +56,7 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 				err,
 			)
 		}
-		s.Logger.Info("create new user")
+		s.Logger.Infof("create new user")
 	case err != nil:
 		return dto.AuthResponse{}, fmt.Errorf(
 			"failed to get user password from Storage: %v",
@@ -67,12 +69,10 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 		DBHashedPassword,
 		[]byte(data.Password),
 	); err != nil {
-		s.Logger.Warn(
-			fmt.Sprintf(
-				"wrong password: %v",
-				hashedUser.Name,
-			),
+		s.Logger.Warnf(
 			domain.ErrUnauthorized,
+			"wrong password: %v",
+			hashedUser.Name,
 		)
 
 		return dto.AuthResponse{}, domain.ErrUnauthorized

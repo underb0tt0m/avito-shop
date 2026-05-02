@@ -1,33 +1,32 @@
-package tools
+package hasher
 
 import (
-	"avito-shop/internal/config"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
-	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
+//go:generate mockgen -source=hasher.go -destination=../mocks/hasher.go -package=mocks -mock_names=Hasher=Hasher
 type Hasher interface {
 	Hash(data string, logger logging.Logger) ([]byte, error)
 	CompareHashAndPassword(hashedPassword []byte, password []byte) error
 }
 
-type bcryptHasher struct{}
+type bcryptHasher struct {
+	hashCost int
+}
 
-func NewHasher() Hasher {
-	return bcryptHasher{}
+func NewHasher(hashCost int) Hasher {
+	return bcryptHasher{hashCost: hashCost}
 }
 
 func (h bcryptHasher) Hash(data string, logger logging.Logger) ([]byte, error) {
-	hashedData, err := bcrypt.GenerateFromPassword([]byte(data), config.App.Security.Hash.Cost)
+	hashedData, err := bcrypt.GenerateFromPassword([]byte(data), h.hashCost)
 	if err != nil {
-		logger.Error(
-			fmt.Sprintf(
-				"failed to hash data",
-			),
+		logger.Errorf(
 			err,
+			"failed to hash data",
 		)
 		return []byte{}, domain.ErrInternalServerError
 	}
@@ -35,6 +34,6 @@ func (h bcryptHasher) Hash(data string, logger logging.Logger) ([]byte, error) {
 	return hashedData, nil
 }
 
-func (h bcryptHasher) CompareHashAndPassword(hashedPassword []byte, password []byte) error {
+func (bcryptHasher) CompareHashAndPassword(hashedPassword, password []byte) error {
 	return bcrypt.CompareHashAndPassword(hashedPassword, password)
 }

@@ -1,349 +1,483 @@
 package handler
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/config"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/mocks"
-	"avito-shop/internal/tools"
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
+	"time"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/mocks"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
-func TestInfo(t *testing.T) {
-	if err := config.Init("../config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	method := "GET"
-	path := "/api/info"
-	token := "Bearer test"
-	logger := mocks.NewLogger(nil)
-	tokenMaker := mocks.NewToken(nil, nil, nil)
-	jsonCodec := tools.NewJSONCodec()
+func TestMain_handleInfo(t *testing.T) {
+	path := "/info"
+	logger := logging.LoggerNoop{}
+	jsonCodec := jsoncodec.NewJSONCodec("sonic")
+	queryTimeout := time.Second
 
+	type fields struct {
+		logger       logging.Logger
+		jsonCodec    jsoncodec.JSONCodec
+		queryTimeout time.Duration
+	}
+	testFields := fields{
+		logger:       logger,
+		jsonCodec:    jsonCodec,
+		queryTimeout: queryTimeout,
+	}
+	type mockSetups struct {
+		service    func(m *mocks.ServiceAPI)
+		tokenMaker func(m *mocks.TokenMaker)
+	}
 	tests := []struct {
 		name           string
+		fields         fields
+		mockSetups     mockSetups
+		withCtx        bool
 		expectedStatus int
-		expectedBody   any
-		serviceSetup   func(s *mocks.MockServiceAPI)
+		expectedBody   dto.Response
 	}{
 		{
-			"successful",
-			http.StatusOK,
-			dto.InfoResponse{
-				Coins:     100,
-				Inventory: []dto.Item{},
+			name:   "successful",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAPI) {
+					m.EXPECT().
+						GetUserInfo(gomock.Any(), "successful").
+						Return(&dto.InfoResponse{}, nil)
+				},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
-			func(s *mocks.MockServiceAPI) {
-				s.EXPECT().
-					GetUserInfo(gomock.Any(), "test").
-					Return(&dto.InfoResponse{
-						Coins:     100,
-						Inventory: []dto.Item{},
-					}, nil)
+			withCtx:        true,
+			expectedStatus: http.StatusOK,
+			expectedBody: dto.InfoResponse{
+				Coins: 0,
+				CoinHistory: dto.History{
+					Received: nil,
+					Sent:     nil,
+				},
+				Inventory: nil,
 			},
 		},
 
 		{
-			"internal_server_error",
-			domain.ErrInternalServerError.Code,
-			dto.ErrorResponse{Errors: domain.ErrInternalServerError.Message},
-			func(s *mocks.MockServiceAPI) {
-				s.EXPECT().
-					GetUserInfo(gomock.Any(), "test").
-					Return(nil, domain.ErrInternalServerError)
+			name:   "error_unauthorised",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
+			withCtx:        false,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrUnauthorized.Message},
+		},
+
+		{
+			name:   "any_error_from_service",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAPI) {
+					m.EXPECT().
+						GetUserInfo(gomock.Any(), "any_error_from_service").
+						Return(&dto.InfoResponse{}, errors.New("Some error"))
+				},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx:        true,
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrInternalServerError.Message},
 		},
 	}
-	t.Logf("\n\n")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			req := httptest.NewRequest(method, path, nil)
-			req.Header.Set("Authorization", token)
-
-			rr := httptest.NewRecorder()
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			serviceAPI := mocks.NewMockServiceAPI(ctrl)
-			tt.serviceSetup(serviceAPI)
+			serviceMock := mocks.NewServiceAPI(ctrl)
+			tokenMakerMock := mocks.NewTokenMaker(ctrl)
 
-			router := chi.NewRouter()
-			router.Route("/api", func(r chi.Router) {
-				r.Use(mocks.Auth(logger, tokenMaker))
-				Main(serviceAPI, r, logger, jsonCodec)
-			})
-
-			router.ServeHTTP(rr, req)
-
-			if rr.Code != tt.expectedStatus {
-				t.Fatalf("expected %v, got %v", tt.expectedStatus, rr.Code)
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			if tt.withCtx {
+				ctx := context.WithValue(req.Context(), domain.UserContextKey, domain.DefaultUser{UserName: tt.name})
+				req = req.WithContext(ctx)
 			}
 
-			switch expected := tt.expectedBody.(type) {
+			rr := httptest.NewRecorder()
+
+			tt.mockSetups.service(serviceMock)
+			tt.mockSetups.tokenMaker(tokenMakerMock)
+
+			h := Main{
+				service:      serviceMock,
+				logger:       tt.fields.logger,
+				jsonCodec:    tt.fields.jsonCodec,
+				queryTimeout: tt.fields.queryTimeout,
+				tokenMaker:   tokenMakerMock,
+			}
+			h.handleInfo(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			switch tt.expectedBody.(type) {
 			case dto.InfoResponse:
-				var got dto.InfoResponse
-				if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-					t.Fatalf("failed to unmarshal info response: %v; body=%s", err, rr.Body.String())
+				var body dto.InfoResponse
+				if err := jsonCodec.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+					t.Fatalf(
+						"failed to unmarshal body. expected: %+v, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
-				if !reflect.DeepEqual(got, expected) {
-					t.Fatalf("expected body %+v, got %+v", expected, got)
-				}
-
+				assert.Equal(t, tt.expectedBody, body)
 			case dto.ErrorResponse:
-				var got dto.ErrorResponse
-				if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-					t.Fatalf("failed to unmarshal error response: %v; body=%s", err, rr.Body.String())
+				var body dto.ErrorResponse
+				if err := jsonCodec.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+					t.Fatalf(
+						"unexpected body scheme. expected: %t, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
-				if !reflect.DeepEqual(got, expected) {
-					t.Fatalf("expected body %+v, got %+v", expected, got)
-				}
-
+				assert.Equal(t, tt.expectedBody, body)
 			default:
-				t.Fatalf("unsupported expectedBody type %T", tt.expectedBody)
+				t.Fatalf(
+					"unexpected body scheme. expected: %t, got: %s",
+					tt.expectedBody,
+					rr.Body.String(),
+				)
 			}
-			t.Logf("subtest %s passed, status: %v, body: %s", tt.name, rr.Code, rr.Body.String())
 		})
 	}
 }
 
-func TestSendCoin(t *testing.T) {
-	method := http.MethodPost
-	path := "/api/sendCoin"
-	token := "Bearer test"
-	logger := mocks.NewLogger(nil)
-	tokenMaker := mocks.NewToken(nil, nil, nil)
-	jsonCodec := tools.NewJSONCodec()
+func TestMain_handleSendCoin(t *testing.T) {
+	path := "/sendCoin"
 
+	logger := logging.LoggerNoop{}
+	jsonCodec := jsoncodec.NewJSONCodec("sonic")
+	queryTimeout := time.Second
+
+	type fields struct {
+		logger       logging.Logger
+		jsonCodec    jsoncodec.JSONCodec
+		queryTimeout time.Duration
+	}
+	testFields := fields{
+		logger:       logger,
+		jsonCodec:    jsonCodec,
+		queryTimeout: queryTimeout,
+	}
+	type mockSetups struct {
+		service    func(m *mocks.ServiceAPI)
+		tokenMaker func(m *mocks.TokenMaker)
+	}
 	tests := []struct {
 		name           string
-		body           any
-		serviceSetup   func(s *mocks.MockServiceAPI)
+		fields         fields
+		mockSetups     mockSetups
+		withCtx        bool
+		requestBody    any
 		expectedStatus int
-		expectedBody   any
+		expectedBody   dto.Response
 	}{
 		{
-			"successful",
-			dto.SendCoinRequest{
+			name:   "successful",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAPI) {
+					m.EXPECT().
+						SendCoins(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil)
+				},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx: true,
+			requestBody: dto.SendCoinRequest{
 				ToUser: "test",
-				Amount: 100,
+				Amount: 10,
 			},
-			func(s *mocks.MockServiceAPI) {
-				s.EXPECT().
-					SendCoins(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil)
-			},
-			http.StatusOK,
-			nil,
+			expectedStatus: http.StatusOK,
+			expectedBody:   nil,
 		},
 
 		{
-			"error_from_service",
-			dto.SendCoinRequest{
+			name:   "error_unauthorized",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx: false,
+			requestBody: dto.SendCoinRequest{
 				ToUser: "test",
-				Amount: 100,
+				Amount: 10,
 			},
-			func(s *mocks.MockServiceAPI) {
-				s.EXPECT().
-					SendCoins(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(domain.ErrInsufficientFunds)
-			},
-			domain.ErrInsufficientFunds.Code,
-			dto.ErrorResponse{Errors: domain.ErrInsufficientFunds.Message},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrUnauthorized.Message},
 		},
 
 		{
-			"error_unprocessable_entity",
-			`{"amount":"not a number"}`,
-			func(s *mocks.MockServiceAPI) {},
-			domain.ErrUnprocessableEntity.Code,
-			dto.ErrorResponse{Errors: domain.ErrUnprocessableEntity.Message},
+			name:   "error_from_service",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAPI) {
+					m.EXPECT().
+						SendCoins(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(errors.New("Some error"))
+				},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx: true,
+			requestBody: dto.SendCoinRequest{
+				ToUser: "test",
+				Amount: 10,
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrInternalServerError.Message},
+		},
+
+		{
+			name:   "error_unprocessable_entity",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx:        true,
+			requestBody:    `{bimbim: "bambam"}`,
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrUnprocessableEntity.Message},
 		},
 	}
-	t.Logf("\n\n")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var body bytes.Buffer
-			if err := json.NewEncoder(&body).Encode(tt.body); err != nil {
-				t.Fatalf("Failed to encode request body: %v", err)
-			}
-			req := httptest.NewRequest(method, path, &body)
-			req.Header.Set("Authorization", token)
-
-			rr := httptest.NewRecorder()
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			serviceAPI := mocks.NewMockServiceAPI(ctrl)
-			tt.serviceSetup(serviceAPI)
+			serviceMock := mocks.NewServiceAPI(ctrl)
+			tt.mockSetups.service(serviceMock)
+			tokenMakerMock := mocks.NewTokenMaker(ctrl)
+			tt.mockSetups.tokenMaker(tokenMakerMock)
 
-			router := chi.NewRouter()
-			router.Route("/api", func(r chi.Router) {
-				r.Use(mocks.Auth(logger, tokenMaker))
-				Main(serviceAPI, r, logger, jsonCodec)
-			})
+			rr := httptest.NewRecorder()
 
-			router.ServeHTTP(rr, req)
-
-			if rr.Code != tt.expectedStatus {
-				t.Fatalf("expected %v, got %v", tt.expectedStatus, rr.Code)
+			var body bytes.Buffer
+			if err := json.NewEncoder(&body).Encode(tt.requestBody); err != nil {
+				t.Fatalf("failed to encode test body: %v", err)
+			}
+			req := httptest.NewRequest(http.MethodPost, path, &body)
+			if tt.withCtx {
+				ctx := context.WithValue(req.Context(), domain.UserContextKey, domain.DefaultUser{UserName: tt.name})
+				req = req.WithContext(ctx)
 			}
 
-			switch expected := tt.expectedBody.(type) {
+			h := Main{
+				service:      serviceMock,
+				logger:       tt.fields.logger,
+				jsonCodec:    tt.fields.jsonCodec,
+				queryTimeout: tt.fields.queryTimeout,
+				tokenMaker:   tokenMakerMock,
+			}
+			h.handleSendCoin(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			switch tt.expectedBody.(type) {
 			case nil:
-				if rr.Body.Len() != 0 {
-					t.Fatalf("expected nil body, got: %s", rr.Body.String())
+				if rr.Body.String() != "" {
+					t.Fatalf(
+						"unexpected body. expected: %+v, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
 			case dto.ErrorResponse:
-				var got dto.ErrorResponse
-				if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-					t.Fatalf("failed to unmarshal response: %v; body=%s", err, rr.Body.String())
+				var responseBody dto.ErrorResponse
+				if err := jsonCodec.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+					t.Fatalf(
+						"unexpected body scheme. expected: %t, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
-				if !reflect.DeepEqual(tt.expectedBody, got) {
-					t.Fatalf("expected body %+v, got %+v", expected, got)
-				}
+				assert.Equal(t, tt.expectedBody, responseBody)
 			default:
-				t.Fatalf("unsupported expectedBody type %T", tt.expectedBody)
+				t.Fatalf(
+					"unexpected body scheme. expected: %t, got: %s",
+					tt.expectedBody,
+					rr.Body.String(),
+				)
 			}
-			t.Logf("subtest %s passed, status: %v, body: %s", tt.name, rr.Code, rr.Body.String())
 		})
 	}
-
 }
 
-func TestBuyItem(t *testing.T) {
-	if err := config.Init("../config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	method := http.MethodPost
-	basicPath := "/api/buy"
-	token := "Bearer token"
-	logger := mocks.NewLogger(nil)
-	tokenMaker := mocks.NewToken(nil, nil, nil)
-	jsonCodec := tools.NewJSONCodec()
+// "successful", "error_bad_itemID", "error_from_service",
+func TestMain_handleBuyItem(t *testing.T) {
+	path := "/buy/"
 
+	logger := logging.LoggerNoop{}
+	jsonCodec := jsoncodec.NewJSONCodec("sonic")
+	queryTimeout := time.Second
+
+	type fields struct {
+		logger       logging.Logger
+		jsonCodec    jsoncodec.JSONCodec
+		queryTimeout time.Duration
+	}
+	testFields := fields{
+		logger:       logger,
+		jsonCodec:    jsonCodec,
+		queryTimeout: queryTimeout,
+	}
+	type mockSetups struct {
+		service    func(m *mocks.ServiceAPI)
+		tokenMaker func(m *mocks.TokenMaker)
+	}
 	tests := []struct {
 		name           string
+		fields         fields
+		mockSetups     mockSetups
+		withCtx        bool
 		itemID         string
-		body           any
-		serviceSetup   func(s *mocks.MockServiceAPI)
 		expectedStatus int
-		expectedBody   any
+		expectedBody   dto.Response
 	}{
 		{
-			"successful",
-			"10",
-			nil,
-			func(s *mocks.MockServiceAPI) {
-				s.EXPECT().
-					BuyItem(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil)
+			name:   "successful",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAPI) {
+					m.EXPECT().
+						BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil)
+				},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
-			http.StatusOK,
-			nil,
+			withCtx:        true,
+			itemID:         "1",
+			expectedStatus: http.StatusOK,
+			expectedBody:   nil,
 		},
 
 		{
-			"error_bad_itemID",
-			"test",
-			nil,
-			func(s *mocks.MockServiceAPI) {},
-			domain.ErrBadRequest.Code,
-			dto.ErrorResponse{Errors: domain.ErrBadRequest.Message},
+			name:   "error_unauthorised",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx:        false,
+			itemID:         "1",
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrUnauthorized.Message},
 		},
 
 		{
-			"error_from_service",
-			"10",
-			nil,
-			func(s *mocks.MockServiceAPI) {
-				s.EXPECT().
-					BuyItem(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(domain.ErrInsufficientFunds)
+			name:   "error_bad_itemID",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service:    func(_ *mocks.ServiceAPI) {},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
 			},
-			domain.ErrInsufficientFunds.Code,
-			dto.ErrorResponse{Errors: domain.ErrInsufficientFunds.Message},
+			withCtx:        true,
+			itemID:         "hehmda",
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrBadRequest.Message},
+		},
+
+		{
+			name:   "error_from_service",
+			fields: testFields,
+			mockSetups: mockSetups{
+				service: func(m *mocks.ServiceAPI) {
+					m.EXPECT().
+						BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(errors.New("Some error"))
+				},
+				tokenMaker: func(_ *mocks.TokenMaker) {},
+			},
+			withCtx:        true,
+			itemID:         "1",
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   dto.ErrorResponse{Errors: domain.ErrInternalServerError.Message},
 		},
 	}
-
-	t.Logf("\n\n")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var body bytes.Buffer
-			if err := json.NewEncoder(&body).Encode(tt.body); err != nil {
-				t.Fatalf("Failed to encode request body: %v", err)
-			}
-
-			fullPath := basicPath + "/" + tt.itemID
-			if tt.itemID == "" {
-				fullPath = basicPath + "/"
-			}
-			req := httptest.NewRequest(method, fullPath, &body)
-			req.Header.Set("Authorization", token)
-
-			rr := httptest.NewRecorder()
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			serviceAPI := mocks.NewMockServiceAPI(ctrl)
-			tt.serviceSetup(serviceAPI)
+			serviceMock := mocks.NewServiceAPI(ctrl)
+			tt.mockSetups.service(serviceMock)
+			tokenMakerMock := mocks.NewTokenMaker(ctrl)
+			tt.mockSetups.tokenMaker(tokenMakerMock)
 
-			router := chi.NewRouter()
-			router.Route("/api", func(r chi.Router) {
-				r.Use(mocks.Auth(logger, tokenMaker))
-				Main(serviceAPI, r, logger, jsonCodec)
-			})
+			rr := httptest.NewRecorder()
 
-			router.ServeHTTP(rr, req)
-
-			if rr.Code != tt.expectedStatus {
-				t.Fatalf("expected %v, got %v", tt.expectedStatus, rr.Code)
+			testPath := path + tt.itemID
+			req := httptest.NewRequest(http.MethodPost, testPath, nil)
+			if tt.withCtx {
+				ctx := context.WithValue(req.Context(), domain.UserContextKey, domain.DefaultUser{UserName: tt.name})
+				req = req.WithContext(ctx)
 			}
+			ctx := context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
+				URLParams: chi.RouteParams{
+					Keys:   []string{"itemID"},
+					Values: []string{tt.itemID},
+				},
+			})
+			req = req.WithContext(ctx)
 
-			switch expected := tt.expectedBody.(type) {
+			h := Main{
+				service:      serviceMock,
+				logger:       tt.fields.logger,
+				jsonCodec:    tt.fields.jsonCodec,
+				queryTimeout: tt.fields.queryTimeout,
+				tokenMaker:   tokenMakerMock,
+			}
+			h.handleBuyItem(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			switch tt.expectedBody.(type) {
 			case nil:
-				if rr.Body.Len() != 0 {
-					t.Fatalf("expected nil body, got: %s", rr.Body.String())
+				if rr.Body.String() != "" {
+					t.Fatalf(
+						"unexpected body. expected: %+v, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
 			case dto.ErrorResponse:
-				var got dto.ErrorResponse
-				if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
-					t.Fatalf("failed to unmarshal response: %v; body=%s", err, rr.Body.String())
+				var responseBody dto.ErrorResponse
+				if err := jsonCodec.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+					t.Fatalf(
+						"unexpected body scheme. expected: %t, got: %s",
+						tt.expectedBody,
+						rr.Body.String(),
+					)
 				}
-				if !reflect.DeepEqual(tt.expectedBody, got) {
-					t.Fatalf("expected body %+v, got %+v", expected, got)
-				}
+				assert.Equal(t, tt.expectedBody, responseBody)
 			default:
-				t.Fatalf("unsupported expectedBody type %T", tt.expectedBody)
+				t.Fatalf(
+					"unexpected body scheme. expected: %t, got: %s",
+					tt.expectedBody,
+					rr.Body.String(),
+				)
 			}
-			t.Logf("subtest %s passed, status: %v, body: %s", tt.name, rr.Code, rr.Body.String())
 		})
 	}
 }

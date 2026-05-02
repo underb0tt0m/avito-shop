@@ -1,84 +1,114 @@
 package handler
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/config"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/logging"
-	"avito-shop/internal/service"
-	"avito-shop/internal/tools"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
+	"time"
+
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/service"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func Auth(s service.Auth, r chi.Router, logger logging.Logger, jsonCodec tools.JSONCodec) {
-	r.Post("/auth", func(w http.ResponseWriter, r *http.Request) {
-		requestBody, err := io.ReadAll(r.Body)
-		defer func() { _ = r.Body.Close() }()
-		if err != nil {
-			logger.Error(
-				"failed to read auth request body",
-				err,
-			)
-			tools.WriteError(w, err)
-			return
-		}
+type Auth struct {
+	service      service.Auth
+	logger       logging.Logger
+	jsonCodec    jsoncodec.JSONCodec
+	queryTimeout time.Duration
+}
 
-		user := dto.AuthRequest{}
-		if err = jsonCodec.Unmarshal(
-			requestBody,
-			&user,
-		); err != nil {
-			logger.Error(
-				"failed to unmarshal auth request body",
-				err,
-			)
-			tools.WriteError(w, domain.ErrUnprocessableEntity)
-			return
-		}
+func NewAuth(
+	authService service.Auth,
+	logger logging.Logger,
+	jsonCodec jsoncodec.JSONCodec,
+	queryTimeout time.Duration,
+) Auth {
+	return Auth{
+		service:      authService,
+		logger:       logger,
+		jsonCodec:    jsonCodec,
+		queryTimeout: queryTimeout,
+	}
+}
 
-		ctx, cancel := context.WithTimeout(r.Context(), config.App.Storage.QueryTimeout)
-		defer cancel()
-		logger.Debug(
-			fmt.Sprintf(
-				"calling AuthService Auth method, username: %v",
-				user.Name,
-			),
+func (h Auth) RegisterRoutes(r chi.Router) {
+	h.Auth(r)
+}
+
+func (h Auth) Auth(r chi.Router) {
+	r.Post("/auth", h.handleAuth)
+}
+
+func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
+	requestBody, err := io.ReadAll(r.Body)
+	defer func() {
+		if err = r.Body.Close(); err != nil {
+			h.logger.Errorf(
+				err,
+				"failed to close auth request body",
+			)
+		}
+	}()
+	if err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to read auth request body",
 		)
-		token, err := s.Auth(ctx, user)
-		if err != nil {
-			logger.Warn(
-				fmt.Sprintf(
-					"authentication denied, username: %v",
-					user.Name,
-				),
-				err,
-			)
-			tools.WriteError(w, err)
-			return
-		}
+		domain.WriteError(w, err, h.logger)
+		return
+	}
 
-		responseBody, err := jsonCodec.Marshal(token)
-		if err != nil {
-			logger.Error(
-				"failed to marshal auth response body",
-				err,
-			)
-			tools.WriteError(w, err)
-			return
-		}
+	user := dto.AuthRequest{}
+	if err = h.jsonCodec.Unmarshal(
+		requestBody,
+		&user,
+	); err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to unmarshal auth request body",
+		)
+		domain.WriteError(w, domain.ErrUnprocessableEntity, h.logger)
+		return
+	}
 
-		if _, err = w.Write(responseBody); err != nil {
-			logger.Error(
-				"failed to write auth response",
-				err,
-			)
-			tools.WriteError(w, err)
-			return
-		}
-	})
+	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
+	defer cancel()
+	h.logger.Debugf(
+		"calling AuthService Auth method, username: %v",
+		user.Name,
+	)
+	token, err := h.service.Auth(ctx, user)
+	if err != nil {
+		h.logger.Warnf(
+			err,
+			"authentication denied, username: %v",
+			user.Name,
+		)
+		domain.WriteError(w, err, h.logger)
+		return
+	}
+
+	responseBody, err := h.jsonCodec.Marshal(token)
+	if err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to marshal auth response body",
+		)
+		domain.WriteError(w, err, h.logger)
+		return
+	}
+
+	if _, err = w.Write(responseBody); err != nil {
+		h.logger.Errorf(
+			err,
+			"failed to write auth response",
+		)
+		domain.WriteError(w, err, h.logger)
+		return
+	}
 }

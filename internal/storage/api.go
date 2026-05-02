@@ -3,9 +3,11 @@ package storage
 import (
 	"avito-shop/internal/domain"
 	"avito-shop/internal/storage/views"
+
 	"context"
 )
 
+//go:generate mockgen -source=api.go -destination=../mocks/storage_api.go -package=mocks -mock_names=API=StorageAPI
 type API interface {
 	GetUserInfo(ctx context.Context, username string) (int, []views.UserInventory, []views.UserTransaction, error)
 	SendCoins(ctx context.Context, fromUser string, transaction domain.SentTransaction) error

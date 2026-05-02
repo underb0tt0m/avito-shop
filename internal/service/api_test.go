@@ -1,322 +1,313 @@
 package service
 
 import (
-	"avito-shop/cmd/dto"
-	"avito-shop/internal/config"
-	"avito-shop/internal/domain"
-	"avito-shop/internal/mocks"
-	"avito-shop/internal/storage"
-	"avito-shop/internal/storage/views"
 	"context"
 	"errors"
 	"reflect"
 	"testing"
 
+	"avito-shop/cmd/dto"
+	"avito-shop/internal/domain"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/mocks"
+	"avito-shop/internal/storage"
+	"avito-shop/internal/storage/views"
+
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/mock/gomock"
 )
 
-func TestGetUserInfo(t *testing.T) {
+func Test_api_GetUserInfo(t *testing.T) {
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+
+	logger := logging.LoggerNoop{}
+
+	storageMock := mocks.NewStorageAPI(ctrl)
+	storageMock.EXPECT().
+		GetUserInfo(ctx, "success_get_user_info").
+		Return(1, []views.UserInventory{}, []views.UserTransaction{}, nil)
+	storageMock.EXPECT().
+		GetUserInfo(ctx, "error_missing_user").
+		Return(0, nil, nil, pgx.ErrNoRows)
+	storageMock.EXPECT().
+		GetUserInfo(ctx, "error_database_unavailable_on_get").
+		Return(0, nil, nil, errors.New("Some error"))
+
+	type fields struct {
+		Storage storage.API
+		Logger  logging.Logger
+	}
+	type args struct {
+		ctx      context.Context
+		username string
+	}
 	tests := []struct {
 		name            string
-		mockStorage     storage.API
-		username        string
-		expected        *dto.InfoResponse
+		fields          fields
+		args            args
+		want            *dto.InfoResponse
 		wantErr         bool
 		wantSpecificErr error
 	}{
 		{
-			"success_get_user_info",
-			mocks.NewStorageAPI(
-				func(ctx context.Context, username string) (
-					int,
-					[]views.UserInventory,
-					[]views.UserTransaction,
-					error,
-				) {
-					return 100,
-						[]views.UserInventory{{"test", 1}},
-						[]views.UserTransaction{
-							{
-								"friend",
-								"test",
-								10,
-							},
-							{
-								"test",
-								"friend",
-								10,
-							},
-						},
-						nil
-				},
-				nil,
-				nil,
-			),
-			"test",
-			&dto.InfoResponse{
-				Coins: 100,
-				Inventory: []dto.Item{
-					{
-						"test",
-						1,
-					},
-				},
-				CoinHistory: dto.History{
-					Received: []dto.ReceivedTransaction{
-						{
-							"friend",
-							10,
-						},
-					},
-					Sent: []dto.SentTransaction{
-						{
-							"friend",
-							10,
-						},
-					},
-				},
+			name: "success_get_user_info",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
 			},
-			false,
-			nil,
-		},
-
-		{
-			"success_user_with_empty_inventory",
-			mocks.NewStorageAPI(
-				func(ctx context.Context, username string) (
-					int,
-					[]views.UserInventory,
-					[]views.UserTransaction, error) {
-					return 100, nil, nil, nil
-				},
-				nil,
-				nil,
-			),
-			"test",
-			&dto.InfoResponse{
-				Coins:     100,
+			args: args{
+				ctx:      ctx,
+				username: "success_get_user_info",
+			},
+			want: &dto.InfoResponse{
+				Coins:     1,
 				Inventory: []dto.Item{},
 				CoinHistory: dto.History{
 					Received: []dto.ReceivedTransaction{},
 					Sent:     []dto.SentTransaction{},
 				},
 			},
-			false,
-			nil,
+			wantErr:         false,
+			wantSpecificErr: nil,
 		},
-
 		{
-			"error_missing_user",
-			mocks.NewStorageAPI(
-				func(ctx context.Context, username string) (
-					int,
-					[]views.UserInventory,
-					[]views.UserTransaction, error) {
-					return 0, nil, nil, pgx.ErrNoRows
-				},
-				nil,
-				nil,
-			),
-			"test",
-			nil,
-			true,
-			domain.ErrNotFound,
+			name: "error_missing_user",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:      ctx,
+				username: "error_missing_user",
+			},
+			want:            nil,
+			wantErr:         true,
+			wantSpecificErr: domain.ErrNotFound,
 		},
-
 		{
-			"error_database_unavailable_on_get",
-			mocks.NewStorageAPI(
-				func(ctx context.Context, username string) (int, []views.UserInventory, []views.UserTransaction, error) {
-					return 0, nil, nil, errors.New("test")
-				},
-				nil,
-				nil,
-			),
-			"test",
-			nil,
-			true,
-			nil,
+			name: "error_database_unavailable_on_get",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:      ctx,
+				username: "error_database_unavailable_on_get",
+			},
+			want:            nil,
+			wantErr:         true,
+			wantSpecificErr: nil,
 		},
 	}
-
-	if err := config.Init("../../cmd/config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	logger := mocks.NewLogger(nil)
-
-	for _, test := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), config.App.Storage.QueryTimeout)
-		TestAPIService := NewApi(
-			test.mockStorage,
-			logger,
-		)
-
-		result, err := TestAPIService.GetUserInfo(ctx, test.username)
-		cancel()
-
-		if err != nil {
-			if !test.wantErr {
-				t.Fatalf("Test %v, GetUserInfo() unexpected error: %v", test.name, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := api{
+				Storage: tt.fields.Storage,
+				Logger:  tt.fields.Logger,
 			}
-			if test.wantSpecificErr != nil && !errors.Is(err, test.wantSpecificErr) {
-				t.Errorf("Test %v, GetUserInfo() = %+v, want %+v", test.name, err, test.wantSpecificErr)
+			got, err := s.GetUserInfo(tt.args.ctx, tt.args.username)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetUserInfo() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-		}
-
-		if !reflect.DeepEqual(result, test.expected) {
-			t.Errorf("Test %v, GetUserInfo() = %+v, want %+v", test.name, result, test.expected)
-		} else {
-			t.Logf("Test %v, GetUserInfo() success: %+v", test.name, result)
-		}
+			if tt.wantSpecificErr != nil && !errors.Is(err, tt.wantSpecificErr) {
+				t.Errorf("GetUserInfo() error = %v, wantSpecificErr %v", err, tt.wantSpecificErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetUserInfo() got = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestSendCoins(t *testing.T) {
+func Test_api_SendCoins(t *testing.T) {
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+
+	logger := logging.LoggerNoop{}
+
+	storageMock := mocks.NewStorageAPI(ctrl)
+	storageMock.EXPECT().
+		SendCoins(ctx, "success_send_coins", gomock.Any()).
+		Return(nil)
+	storageMock.EXPECT().
+		SendCoins(ctx, "error_insufficient_funds", gomock.Any()).
+		Return(domain.ErrInsufficientFunds)
+	storageMock.EXPECT().
+		SendCoins(ctx, "error_other_errors", gomock.Any()).
+		Return(errors.New("Some error"))
+
+	type fields struct {
+		Storage storage.API
+		Logger  logging.Logger
+	}
+	type args struct {
+		ctx      context.Context
+		fromUser string
+		toUser   dto.SendCoinRequest
+	}
 	tests := []struct {
 		name            string
-		mockStorage     storage.API
-		fromUser        string
-		toUser          dto.SendCoinRequest
+		fields          fields
+		args            args
 		wantErr         bool
 		wantSpecificErr error
 	}{
 		{
-			"success_send_coins",
-			mocks.NewStorageAPI(nil, nil, nil),
-			"test",
-			dto.SendCoinRequest{Amount: 1},
-			false,
-			nil,
-		},
-
-		{
-			"error_not_positive_amount",
-			mocks.NewStorageAPI(nil, nil, nil),
-			"test",
-			dto.SendCoinRequest{},
-			true,
-			domain.ErrBadRequest,
-		},
-
-		{
-			"error_insufficient_funds",
-			mocks.NewStorageAPI(
-				nil,
-				func(ctx context.Context, fromUser string, transaction domain.SentTransaction) error {
-					return domain.ErrInsufficientFunds
+			name: "success_send_coins",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:      ctx,
+				fromUser: "success_send_coins",
+				toUser: dto.SendCoinRequest{
+					ToUser: "test",
+					Amount: 10,
 				},
-				nil,
-			),
-			"test",
-			dto.SendCoinRequest{Amount: 1},
-			true,
-			domain.ErrInsufficientFunds,
+			},
+			wantErr:         false,
+			wantSpecificErr: nil,
 		},
-
 		{
-			"error_other_errors",
-			mocks.NewStorageAPI(
-				nil,
-				func(ctx context.Context, fromUser string, transaction domain.SentTransaction) error {
-					return errors.New("test")
+			name: "error_not_positive_amount",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:      ctx,
+				fromUser: "test",
+				toUser: dto.SendCoinRequest{
+					ToUser: "test",
+					Amount: -10,
 				},
-				nil,
-			),
-			"test",
-			dto.SendCoinRequest{Amount: 1},
-			true,
-			nil,
+			},
+			wantErr:         true,
+			wantSpecificErr: domain.ErrBadRequest,
+		},
+		{
+			name: "error_insufficient_funds",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:      ctx,
+				fromUser: "error_insufficient_funds",
+				toUser: dto.SendCoinRequest{
+					ToUser: "test",
+					Amount: 10,
+				},
+			},
+			wantErr:         true,
+			wantSpecificErr: domain.ErrInsufficientFunds,
+		},
+		{
+			name: "error_other_errors",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:      ctx,
+				fromUser: "error_other_errors",
+				toUser: dto.SendCoinRequest{
+					ToUser: "test",
+					Amount: 10,
+				},
+			},
+			wantErr:         true,
+			wantSpecificErr: nil,
 		},
 	}
-
-	if err := config.Init("../../cmd/config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	logger := mocks.NewLogger(nil)
-
-	for _, test := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), config.App.Storage.QueryTimeout)
-		TestAPIService := NewApi(
-			test.mockStorage,
-			logger,
-		)
-
-		err := TestAPIService.SendCoins(ctx, test.fromUser, test.toUser)
-		cancel()
-
-		if err != nil {
-			if !test.wantErr {
-				t.Fatalf("Test %v, SendCoins() unexpected error: %v", test.name, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := api{
+				Storage: tt.fields.Storage,
+				Logger:  tt.fields.Logger,
 			}
-			if test.wantSpecificErr != nil && !errors.Is(err, test.wantSpecificErr) {
-				t.Errorf("Test %v, SendCoins() = %+v, want %+v", test.name, err, test.wantSpecificErr)
+			err := s.SendCoins(tt.args.ctx, tt.args.fromUser, tt.args.toUser)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SendCoins() error = %v, wantErr %v", err, tt.wantErr)
 			}
-		}
-		if err == nil && !test.wantErr {
-			t.Logf("Test %v, SendCoins() success", test.name)
-		}
+			if tt.wantSpecificErr != nil && !errors.Is(err, tt.wantSpecificErr) {
+				t.Errorf("GetUserInfo() error = %v, wantSpecificErr %v", err, tt.wantSpecificErr)
+				return
+			}
+		})
 	}
 }
 
-func TestBuyItem(t *testing.T) {
+// "success_buy_item", "error_any",
+func Test_api_BuyItem(t *testing.T) {
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+
+	logger := logging.LoggerNoop{}
+
+	storageMock := mocks.NewStorageAPI(ctrl)
+	storageMock.EXPECT().
+		BuyItem(ctx, gomock.Any(), "success_buy_item").
+		Return(nil)
+	storageMock.EXPECT().
+		BuyItem(ctx, gomock.Any(), "error_any").
+		Return(errors.New("Some error"))
+
+	type fields struct {
+		Storage storage.API
+		Logger  logging.Logger
+	}
+	type args struct {
+		ctx    context.Context
+		itemID int
+		user   string
+	}
 	tests := []struct {
-		name            string
-		mockStorage     storage.API
-		itemID          int
-		user            string
-		wantErr         bool
-		wantSpecificErr error
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
 	}{
 		{
-			"success_buy_item",
-			mocks.NewStorageAPI(nil, nil, nil),
-			1,
-			"test",
-			false,
-			nil,
+			name: "success_buy_item",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:    ctx,
+				itemID: 1,
+				user:   "success_buy_item",
+			},
+			wantErr: false,
 		},
-
 		{
-			"error_any",
-			mocks.NewStorageAPI(
-				nil,
-				nil,
-				func(ctx context.Context, itemID int, user string) error {
-					return errors.New("test")
-				},
-			),
-			1,
-			"test",
-			true,
-			nil,
+			name: "error_any",
+			fields: fields{
+				Storage: storageMock,
+				Logger:  logger,
+			},
+			args: args{
+				ctx:    ctx,
+				itemID: 1,
+				user:   "error_any",
+			},
+			wantErr: true,
 		},
 	}
-
-	if err := config.Init("../../cmd/config.yaml"); err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	logger := mocks.NewLogger(nil)
-
-	for _, test := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), config.App.Storage.QueryTimeout)
-		TestAPIService := NewApi(
-			test.mockStorage,
-			logger,
-		)
-
-		err := TestAPIService.BuyItem(ctx, test.itemID, test.user)
-		cancel()
-
-		if err != nil {
-			if !test.wantErr {
-				t.Fatalf("Test %v, BuyItem() unexpected error: %v", test.name, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := api{
+				Storage: tt.fields.Storage,
+				Logger:  tt.fields.Logger,
 			}
-			if test.wantSpecificErr != nil && !errors.Is(err, test.wantSpecificErr) {
-				t.Errorf("Test %v, BuyItem() = %+v, want %+v", test.name, err, test.wantSpecificErr)
+			if err := s.BuyItem(tt.args.ctx, tt.args.itemID, tt.args.user); (err != nil) != tt.wantErr {
+				t.Errorf("BuyItem() error = %v, wantErr %v", err, tt.wantErr)
 			}
-		}
-		if err == nil && !test.wantErr {
-			t.Logf("Test %v, BuyItem() success", test.name)
-		}
+		})
 	}
 }

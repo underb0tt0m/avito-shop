@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config представляет основную структуру конфигурации приложения.
 type Config struct {
 	ServerType string   `yaml:"server_type"`
 	Port       string   `yaml:"port"`
@@ -16,12 +17,15 @@ type Config struct {
 	Security   Security `yaml:"security"`
 }
 
+// Storage представляет конфигурацию хранилища данных.
 type Storage struct {
 	Type         string        `yaml:"type"`
 	Version      string        `yaml:"version"`
 	Connection   Connection    `yaml:"connection"`
 	QueryTimeout time.Duration `yaml:"query_timeout"`
 }
+
+// Connection представляет параметры подключения к базе данных.
 type Connection struct {
 	Driver   string `yaml:"driver"`
 	User     string
@@ -30,41 +34,37 @@ type Connection struct {
 	Port     string `yaml:"port"`
 	Database string `yaml:"database"`
 }
+
+// Logger представляет конфигурацию логирования.
 type Logger struct {
 	Type  string `yaml:"type"`
 	Level string `yaml:"level"`
 }
 
+// Tools представляет конфигурацию вспомогательных инструментов.
 type Tools struct {
-	JSON string `yaml:"json"`
+	JSON string `yaml:"jsoncodec"`
 }
 
+// Security представляет конфигурацию безопасности.
 type Security struct {
 	Hash     Hash     `yaml:"hash"`
 	JWTToken JWTToken `yaml:"jwt_token"`
 }
 
+// Hash представляет конфигурацию хэширования паролей.
 type Hash struct {
 	Cost int `yaml:"cost"`
 }
 
+// JWTToken представляет конфигурацию JWT токенов.
 type JWTToken struct {
 	SecretKey []byte
 	Lifetime  time.Duration `yaml:"lifetime"`
 	Prefix    string        `yaml:"prefix"`
 }
 
-var App *Config
-
-func Init(path string) error {
-	cfg, err := Load(path)
-	if err != nil {
-		return err
-	}
-	App = cfg
-	return nil
-}
-
+// Load загружает и парсит конфигурацию из YAML файла по указанному пути.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
