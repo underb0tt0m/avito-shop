@@ -1,4 +1,4 @@
-.PHONY: build run test test-fast lint clean help lint
+.PHONY: build run test test-fast test-ci lint clean help lint
 
 BINARY_NAME=avito-shop
 BINARY_PATH=bin/$(BINARY_NAME)
@@ -16,6 +16,9 @@ test:
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 	go tool cover -func=coverage.out
+
+test-ci:
+	go test -v ./...
 
 clean:
 	rm -rf bin/
