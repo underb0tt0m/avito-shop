@@ -9,11 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/jsoncodec"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/mocks"
+	"avito-shop/internal/prometheus_metrics"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -103,6 +106,7 @@ func TestAuth_handleAuth(t *testing.T) {
 
 			serviceMock := mocks.NewServiceAuth(ctrl)
 			tt.mockSetups.service(serviceMock)
+			m := prometheus_metrics.New(prometheus.NewRegistry())
 
 			var body bytes.Buffer
 			if err := json.NewEncoder(&body).Encode(tt.requestBody); err != nil {
@@ -116,6 +120,7 @@ func TestAuth_handleAuth(t *testing.T) {
 				logger:       tt.fields.logger,
 				jsonCodec:    tt.fields.jsonCodec,
 				queryTimeout: tt.fields.queryTimeout,
+				metrics:      m,
 			}
 			h.handleAuth(rr, req)
 

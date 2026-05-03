@@ -1,14 +1,6 @@
 package main
 
 import (
-	"avito-shop/cmd/handler"
-	"avito-shop/internal/api_middleware"
-	"avito-shop/internal/config"
-	"avito-shop/internal/hasher"
-	"avito-shop/internal/jsoncodec"
-	"avito-shop/internal/jwtmanager"
-	"avito-shop/internal/logging"
-
 	"context"
 	"errors"
 	"fmt"
@@ -20,12 +12,21 @@ import (
 	"syscall"
 	"time"
 
-	"avito-shop/internal/service"
-	"avito-shop/internal/storage/postgres"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+
+	"avito-shop/cmd/handler"
+	"avito-shop/internal/api_middleware"
+	"avito-shop/internal/config"
+	"avito-shop/internal/hasher"
+	"avito-shop/internal/jsoncodec"
+	"avito-shop/internal/jwtmanager"
+	"avito-shop/internal/logging"
+	"avito-shop/internal/prometheus_metrics"
+	"avito-shop/internal/service"
+	"avito-shop/internal/storage/postgres"
 )
 
 func main() {
@@ -33,7 +34,7 @@ func main() {
 		log.Fatalf("failed to load .env: %v", err)
 	}
 
-	cfg, err := config.Load("cmd/config.yaml")
+	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Fatalf("failed to load .env: %v", err)
 	}
@@ -75,21 +76,27 @@ func main() {
 	)
 	Hasher := hasher.NewHasher(cfg.Security.Hash.Cost)
 
+	reg := prometheus.NewRegistry()
+	m := prometheus_metrics.New(reg)
+
 	storageAPI := postgres.NewStorageAPI(conn, logger)
 	serviceAPI := service.NewApi(storageAPI, logger)
 
 	storageAuth := postgres.NewStorageAuth(conn, logger)
-	serviceAuth := service.NewAuth(storageAuth, logger, tokenMaker, Hasher)
+	serviceAuth := service.NewAuth(storageAuth, logger, tokenMaker, Hasher, m)
 
-	MainHandler := handler.NewMain(serviceAPI, logger, jsonCodec, cfg.Storage.QueryTimeout, tokenMaker)
-	AuthHandler := handler.NewAuth(serviceAuth, logger, jsonCodec, cfg.Storage.QueryTimeout)
+	MainHandler := handler.NewMain(serviceAPI, logger, jsonCodec, cfg.Storage.QueryTimeout, tokenMaker, m)
+	AuthHandler := handler.NewAuth(serviceAuth, logger, jsonCodec, cfg.Storage.QueryTimeout, m)
+	MetricsHandler := handler.NewMetrics(m, reg)
 
 	router := chi.NewRouter()
 	router.Use(api_middleware.Stopwatch(logger))
+	router.Use(prometheus_metrics.Middlware(m, logger))
 
 	router.Route("/api", func(r chi.Router) {
 		MainHandler.RegisterRoutes(r)
 		AuthHandler.RegisterRoutes(r)
+		MetricsHandler.RegisterRoutes(r)
 	})
 
 	server := http.Server{
@@ -147,9 +154,21 @@ func CreatePool(ctx context.Context, connParam config.Storage) (*pgxpool.Pool, e
 		connParam.Connection.Database,
 	)
 
-	pool, err := pgxpool.New(ctx, connStr)
+	cfg, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		return nil, err
 	}
+	cfg.MaxConns = 300 // TODO добавить в конфиг
+	cfg.MinConns = 75
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.MaxConnLifetimeJitter = 5 * time.Second
+	cfg.HealthCheckPeriod = 1 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return pool, nil
 }

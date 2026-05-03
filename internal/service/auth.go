@@ -10,6 +10,7 @@ import (
 	"avito-shop/internal/hasher"
 	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
+	"avito-shop/internal/prometheus_metrics"
 	"avito-shop/internal/storage"
 
 	"github.com/jackc/pgx/v5"
@@ -25,14 +26,17 @@ type auth struct {
 	Logger     logging.Logger
 	TokenMaker jwtmanager.TokenMaker
 	Hasher     hasher.Hasher
+	Metrics    *prometheus_metrics.Metrics
 }
 
-func NewAuth(s storage.Auth, l logging.Logger, t jwtmanager.TokenMaker, h hasher.Hasher) Auth {
+//nolint:revive
+func NewAuth(s storage.Auth, l logging.Logger, t jwtmanager.TokenMaker, h hasher.Hasher, m *prometheus_metrics.Metrics) Auth {
 	return auth{
 		Storage:    s,
 		Logger:     l,
 		TokenMaker: t,
 		Hasher:     h,
+		Metrics:    m,
 	}
 }
 
@@ -57,6 +61,7 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 			)
 		}
 		s.Logger.Infof("create new user")
+		s.Metrics.RegisteredUsers.Inc()
 	case err != nil:
 		return dto.AuthResponse{}, fmt.Errorf(
 			"failed to get user password from Storage: %v",

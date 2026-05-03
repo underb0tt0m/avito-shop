@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"avito-shop/internal/domain"
 	"avito-shop/internal/logging"
@@ -165,7 +166,12 @@ WHERE u1.name = $2 AND u2.name = $3;
 	}
 	defer func() {
 		if err = tx.Rollback(ctx); err != nil {
-			s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+			if !errors.Is(err, pgx.ErrTxClosed) &&
+				!errors.Is(err, context.Canceled) &&
+				!errors.Is(err, context.DeadlineExceeded) &&
+				!strings.Contains(err.Error(), "conn closed") {
+				s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+			}
 		}
 	}()
 
@@ -259,7 +265,12 @@ func (s storageAPI) BuyItem(ctx context.Context, itemID int, user string) error 
 	}
 	defer func() {
 		if err = tx.Rollback(ctx); err != nil {
-			s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+			if !errors.Is(err, pgx.ErrTxClosed) &&
+				!errors.Is(err, context.Canceled) &&
+				!errors.Is(err, context.DeadlineExceeded) &&
+				!strings.Contains(err.Error(), "conn closed") {
+				s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+			}
 		}
 	}()
 

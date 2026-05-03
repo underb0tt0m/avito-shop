@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/mock/gomock"
 
 	"avito-shop/cmd/dto"
@@ -15,6 +16,7 @@ import (
 	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/mocks"
+	"avito-shop/internal/prometheus_metrics"
 	"avito-shop/internal/storage"
 )
 
@@ -322,6 +324,7 @@ func Test_auth_Auth(t *testing.T) {
 				Logger:     tt.fields.Logger,
 				TokenMaker: tt.fields.TokenMaker,
 				Hasher:     tt.fields.Hasher,
+				Metrics:    prometheus_metrics.New(prometheus.NewRegistry()),
 			}
 			tt.mockSetups.Storage(storageMock)
 			tt.mockSetups.Hasher(hasherMock)
