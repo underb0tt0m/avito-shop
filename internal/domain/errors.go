@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/logging"
+	"avito-shop/internal/prometheus_metrics"
 )
 
 type APIErr struct {
@@ -57,9 +59,12 @@ var (
 	}
 )
 
-func WriteError(w http.ResponseWriter, err error, logger logging.Logger) {
+func WriteError(w http.ResponseWriter, err error, logger logging.Logger, m *prometheus_metrics.Metrics) {
 	if apiErr, ok := errors.AsType[APIErr](err); ok {
 		w.WriteHeader(apiErr.Code)
+
+		m.Errors.WithLabelValues(strconv.Itoa(apiErr.Code))
+
 		response, marshalErr := json.Marshal(dto.ErrorResponse{Errors: apiErr.Message})
 		if marshalErr != nil {
 			logger.Errorf(err, "failed to marshal request body: %v", err)
@@ -71,6 +76,7 @@ func WriteError(w http.ResponseWriter, err error, logger logging.Logger) {
 		}
 		return
 	}
+	m.Errors.WithLabelValues(strconv.Itoa(ErrInternalServerError.Code))
 	w.WriteHeader(ErrInternalServerError.Code)
 	response, err := json.Marshal(dto.ErrorResponse{Errors: ErrInternalServerError.Message})
 	if err != nil {

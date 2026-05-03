@@ -10,11 +10,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"avito-shop/cmd/dto"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/jsoncodec"
 	"avito-shop/internal/logging"
 	"avito-shop/internal/mocks"
+	"avito-shop/internal/prometheus_metrics"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -107,6 +110,7 @@ func TestMain_handleInfo(t *testing.T) {
 
 			serviceMock := mocks.NewServiceAPI(ctrl)
 			tokenMakerMock := mocks.NewTokenMaker(ctrl)
+			m := prometheus_metrics.New(prometheus.NewRegistry())
 
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			if tt.withCtx {
@@ -125,6 +129,7 @@ func TestMain_handleInfo(t *testing.T) {
 				jsonCodec:    tt.fields.jsonCodec,
 				queryTimeout: tt.fields.queryTimeout,
 				tokenMaker:   tokenMakerMock,
+				metrics:      m,
 			}
 			h.handleInfo(rr, req)
 
@@ -270,6 +275,7 @@ func TestMain_handleSendCoin(t *testing.T) {
 			tt.mockSetups.service(serviceMock)
 			tokenMakerMock := mocks.NewTokenMaker(ctrl)
 			tt.mockSetups.tokenMaker(tokenMakerMock)
+			m := prometheus_metrics.New(prometheus.NewRegistry())
 
 			rr := httptest.NewRecorder()
 
@@ -289,6 +295,7 @@ func TestMain_handleSendCoin(t *testing.T) {
 				jsonCodec:    tt.fields.jsonCodec,
 				queryTimeout: tt.fields.queryTimeout,
 				tokenMaker:   tokenMakerMock,
+				metrics:      m,
 			}
 			h.handleSendCoin(rr, req)
 
@@ -424,6 +431,7 @@ func TestMain_handleBuyItem(t *testing.T) {
 			tt.mockSetups.service(serviceMock)
 			tokenMakerMock := mocks.NewTokenMaker(ctrl)
 			tt.mockSetups.tokenMaker(tokenMakerMock)
+			m := prometheus_metrics.New(prometheus.NewRegistry())
 
 			rr := httptest.NewRecorder()
 
@@ -447,6 +455,7 @@ func TestMain_handleBuyItem(t *testing.T) {
 				jsonCodec:    tt.fields.jsonCodec,
 				queryTimeout: tt.fields.queryTimeout,
 				tokenMaker:   tokenMakerMock,
+				metrics:      m,
 			}
 			h.handleBuyItem(rr, req)
 

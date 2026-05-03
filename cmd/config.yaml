@@ -9,11 +9,11 @@ storage:
     host: "localhost" # при запуске в docker-compose необходимо название контейнера БД
     port: "5432"
     database: "avito_shop"
-  query_timeout: "1s"
+  query_timeout: "5s"
 
 logger:                              # TODO
   type: "zap_logging"
-  level: "debug"
+  level: "warn"
 
 tools:
   json: "sonic"

@@ -13,6 +13,7 @@ import (
 	jsoncodec "avito-shop/internal/jsoncodec"
 	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
+	"avito-shop/internal/prometheus_metrics"
 	"avito-shop/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -24,6 +25,7 @@ type Main struct {
 	jsonCodec    jsoncodec.JSONCodec
 	queryTimeout time.Duration
 	tokenMaker   jwtmanager.TokenMaker
+	metrics      *prometheus_metrics.Metrics
 }
 
 //nolint:revive
@@ -33,6 +35,7 @@ func NewMain(
 	jsonCodec jsoncodec.JSONCodec,
 	queryTimeout time.Duration,
 	tokenMaker jwtmanager.TokenMaker,
+	metrics *prometheus_metrics.Metrics,
 ) Main {
 	return Main{
 		service:      service,
@@ -40,12 +43,13 @@ func NewMain(
 		jsonCodec:    jsonCodec,
 		queryTimeout: queryTimeout,
 		tokenMaker:   tokenMaker,
+		metrics:      metrics,
 	}
 }
 
 func (h Main) RegisterRoutes(r chi.Router) {
 	r.Group(func(r chi.Router) {
-		r.Use(api_middleware.Auth(h.logger, h.tokenMaker))
+		r.Use(api_middleware.Auth(h.logger, h.tokenMaker, h.metrics))
 
 		h.GetInfo(r)
 		h.SendCoin(r)
@@ -60,7 +64,7 @@ func (h Main) GetInfo(r chi.Router) {
 func (h Main) handleInfo(w http.ResponseWriter, r *http.Request) {
 	user, err := domain.GetUserFromContext(r)
 	if err != nil {
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 
@@ -72,7 +76,7 @@ func (h Main) handleInfo(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("calling mainRoutService GetUserInfo method")
 	dtoUser, err := h.service.GetUserInfo(ctx, username)
 	if err != nil {
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 
@@ -82,7 +86,7 @@ func (h Main) handleInfo(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to marshal user info response",
 		)
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 	if _, err = w.Write(response); err != nil {
@@ -90,7 +94,7 @@ func (h Main) handleInfo(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to write info response",
 		)
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 }
@@ -114,7 +118,7 @@ func (h Main) handleSendCoin(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to read request body",
 		)
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 
@@ -127,13 +131,13 @@ func (h Main) handleSendCoin(w http.ResponseWriter, r *http.Request) {
 			err,
 			"failed to unmarshal request body",
 		)
-		domain.WriteError(w, domain.ErrUnprocessableEntity, h.logger)
+		domain.WriteError(w, domain.ErrUnprocessableEntity, h.logger, h.metrics)
 		return
 	}
 
 	user, err := domain.GetUserFromContext(r)
 	if err != nil {
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 
@@ -144,9 +148,11 @@ func (h Main) handleSendCoin(w http.ResponseWriter, r *http.Request) {
 		user.UserName,
 		transaction,
 	); err != nil {
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
+		h.metrics.Transactions.WithLabelValues(prometheus_metrics.StatusTransactionFailed).Inc()
 		return
 	}
+	h.metrics.Transactions.WithLabelValues(prometheus_metrics.StatusTransactionSuccess).Inc()
 }
 
 func (h Main) BuyItem(r chi.Router) {
@@ -156,7 +162,7 @@ func (h Main) BuyItem(r chi.Router) {
 func (h Main) handleBuyItem(w http.ResponseWriter, r *http.Request) {
 	user, err := domain.GetUserFromContext(r)
 	if err != nil {
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
 
@@ -166,7 +172,7 @@ func (h Main) handleBuyItem(w http.ResponseWriter, r *http.Request) {
 			domain.ErrBadRequest,
 			"attempt to buy item with empty param {item}",
 		)
-		domain.WriteError(w, domain.ErrBadRequest, h.logger)
+		domain.WriteError(w, domain.ErrBadRequest, h.logger, h.metrics)
 		return
 	}
 
@@ -176,14 +182,15 @@ func (h Main) handleBuyItem(w http.ResponseWriter, r *http.Request) {
 			domain.ErrBadRequest,
 			"attempt to buy item with invalid id",
 		)
-		domain.WriteError(w, domain.ErrBadRequest, h.logger)
+		domain.WriteError(w, domain.ErrBadRequest, h.logger, h.metrics)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.queryTimeout)
 	defer cancel()
 	if err = h.service.BuyItem(ctx, itemID, user.UserName); err != nil {
-		domain.WriteError(w, err, h.logger)
+		domain.WriteError(w, err, h.logger, h.metrics)
 		return
 	}
+	h.metrics.Purchases.WithLabelValues(strItemID).Inc()
 }
