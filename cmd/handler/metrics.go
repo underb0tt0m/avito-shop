@@ -10,12 +10,12 @@ import (
 
 type Metrics struct {
 	metrics *prometheus_metrics.Metrics
-	reg     *prometheus.Registry
+	reg     prometheus.Registerer
 }
 
 func NewMetrics(
 	metrics *prometheus_metrics.Metrics,
-	reg *prometheus.Registry,
+	reg prometheus.Registerer,
 ) Metrics {
 	return Metrics{
 		metrics: metrics,
@@ -24,7 +24,8 @@ func NewMetrics(
 }
 
 func (h Metrics) RegisterRoutes(r chi.Router) {
-	r.Handle("/metrics", promhttp.HandlerFor(h.reg, promhttp.HandlerOpts{
+	// nolint:errcheck
+	r.Handle("/metrics", promhttp.HandlerFor(h.reg.(prometheus.Gatherer), promhttp.HandlerOpts{
 		Registry: h.reg,
 	}))
 }

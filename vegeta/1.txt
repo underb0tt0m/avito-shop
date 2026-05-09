@@ -1,4 +1,2 @@
-POST http://localhost:8080/api/sendCoin
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Nzc4NDk2NDYsImlhdCI6MTc3Nzc2MzI0NiwiaXNzIjoiYXBwIiwidXNlcm5hbWUiOiJ0aW11ciJ9.j389rZPFpMY30zzc9tUUXja4eqV66juKV0rONVOWNDk
-Content-Type: application/json
-@./vegeta/send_user2.json
+GET http://localhost:8080/api/info
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Nzg0MTYzNTYsImlhdCI6MTc3ODMyOTk1NiwiaXNzIjoiYXBwIiwidXNlcm5hbWUiOiJ0aW11ciJ9.qsGWXMXHDNYjlcsWaCpr6aJyMdP-bk5XOycSIl0Y5as

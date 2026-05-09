@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: app
     build:
       context: ..
       dockerfile: cmd/Dockerfile
@@ -17,6 +18,7 @@ services:
 
   db:
     image: postgres:18-alpine
+    container_name: db
     command: -c max_connections=350 # TODO конфиг
     environment:
       POSTGRES_USER: postgres
@@ -34,6 +36,7 @@ services:
 
   migrations:
     image: migrate/migrate:v4.19.1
+    container_name: migrations
     command:
       - "-path"
       - "/migrations"
@@ -56,6 +59,19 @@ services:
     depends_on:
       app:
         condition: service_started
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - grafanadata:/var/lib/grafana
 
 volumes:
   postgres_data:
+  grafanadata:
