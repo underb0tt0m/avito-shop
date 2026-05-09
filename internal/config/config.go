@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -19,10 +20,11 @@ type Config struct {
 
 // Storage представляет конфигурацию хранилища данных.
 type Storage struct {
-	Type         string        `yaml:"type"`
-	Version      string        `yaml:"version"`
-	Connection   Connection    `yaml:"connection"`
-	QueryTimeout time.Duration `yaml:"query_timeout"`
+	Type          string        `yaml:"type"`
+	Version       string        `yaml:"version"`
+	ContainerName string        `yaml:"container_name"`
+	Connection    Connection    `yaml:"connection"`
+	QueryTimeout  time.Duration `yaml:"query_timeout"`
 }
 
 // Connection представляет параметры подключения к базе данных.
@@ -66,6 +68,11 @@ type JWTToken struct {
 
 // Load загружает и парсит конфигурацию из YAML файла по указанному пути.
 func Load(path string) (*Config, error) {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		pathSlice := strings.Split(path, "/")
+		path = pathSlice[len(pathSlice)-1]
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return &Config{}, err
@@ -73,6 +80,10 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		return &Config{}, err
+	}
+
+	if _, err = os.Stat("/.dockerenv"); err == nil {
+		cfg.Storage.Connection.Host = cfg.Storage.ContainerName
 	}
 
 	cfg.Storage.Connection.User = os.Getenv("DB_USER")

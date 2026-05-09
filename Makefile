@@ -1,7 +1,13 @@
-.PHONY: build run test test-fast test-ci lint clean help lint
+.PHONY: docker-compose-build docker-compose-up build run test test-fast test-ci lint clean help lint
 
 BINARY_NAME=avito-shop
 BINARY_PATH=bin/$(BINARY_NAME)
+
+docker-compose-build-up:
+	docker compose -f ./cmd/docker-compose.yaml -p avito-shop up --build -d
+
+docker-compose-up:
+	docker compose -f ./cmd/docker-compose.yaml -p avito-shop up -d
 
 build:
 	go build -v -o $(BINARY_PATH) ./cmd/

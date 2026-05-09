@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("failed to load .env: %v", err)
 	}
 
-	cfg, err := config.Load("config.yaml")
+	cfg, err := config.Load("./cmd/config.yaml")
 	if err != nil {
 		log.Fatalf("failed to load .env: %v", err)
 	}
@@ -76,7 +76,7 @@ func main() {
 	)
 	Hasher := hasher.NewHasher(cfg.Security.Hash.Cost)
 
-	reg := prometheus.NewRegistry()
+	reg := prometheus.DefaultRegisterer
 	m := prometheus_metrics.New(reg)
 
 	storageAPI := postgres.NewStorageAPI(conn, logger)

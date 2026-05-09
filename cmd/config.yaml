@@ -1,19 +1,20 @@
 server_type: "development"           # TODO
-port: "8080" # при смене изменить docker-compose.yaml
+port: "8080"
 
 storage:
   type: "postgres"                 # TODO
   version: "18-alpine"
+  container_name: "db"
   connection:
     driver: "postgres"
-    host: "localhost" # при запуске в docker-compose необходимо название контейнера БД
+    host: "localhost"
     port: "5432"
     database: "avito_shop"
   query_timeout: "5s"
 
 logger:                              # TODO
   type: "zap_logging"
-  level: "warn"
+  level: "info"
 
 tools:
   json: "sonic"

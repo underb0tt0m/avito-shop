@@ -15,29 +15,28 @@ const (
 )
 
 type Metrics struct {
-	RequestCounter  prometheus.Counter
-	RequestDuration prometheus.Histogram
+	RequestDuration *prometheus.HistogramVec
 	AuthAttempts    *prometheus.CounterVec
 	RegisteredUsers prometheus.Counter
 	Transactions    *prometheus.CounterVec
 	Purchases       *prometheus.CounterVec
 	Errors          *prometheus.CounterVec
+	RequestSize     *prometheus.CounterVec
+	ResponseSize    *prometheus.CounterVec
 }
 
 func New(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
-		RequestCounter: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "http_request_count",
-			Help: "Current count of requests since last app start",
-		}),
-		RequestDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name:    "http_request_duration_seconds",
+		RequestDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "echo_request_duration_seconds",
 			Buckets: []float64{0.01, 0.025, 0.05, 0.075, 0.1, 0.25},
-		}),
+		},
+			[]string{"instance", "code"},
+		),
 		AuthAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "auth_attempts_total",
 		},
-			[]string{"Status"},
+			[]string{"code"},
 		),
 		RegisteredUsers: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "users_registered_total",
@@ -45,7 +44,7 @@ func New(reg prometheus.Registerer) *Metrics {
 		Transactions: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "transactions_total",
 		},
-			[]string{"Status"},
+			[]string{"code"},
 		),
 		Purchases: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "purchases_total",
@@ -56,17 +55,30 @@ func New(reg prometheus.Registerer) *Metrics {
 			Name: "errors_user_total",
 			Help: "Уrrors caused by the client",
 		},
-			[]string{"Status"},
+			[]string{"code"},
+		),
+		RequestSize: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "echo_request_size_bytes_sum",
+			Help: "Total transferred request data",
+		},
+			[]string{"instance", "code"},
+		),
+		ResponseSize: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "echo_response_size_bytes_sum",
+			Help: "Total transferred response data",
+		},
+			[]string{"instance", "code"},
 		),
 	}
 
-	reg.MustRegister(m.RequestCounter)
 	reg.MustRegister(m.RequestDuration)
 	reg.MustRegister(m.AuthAttempts)
 	reg.MustRegister(m.RegisteredUsers)
 	reg.MustRegister(m.Transactions)
 	reg.MustRegister(m.Purchases)
 	reg.MustRegister(m.Errors)
+	reg.MustRegister(m.RequestSize)
+	reg.MustRegister(m.ResponseSize)
 
 	return m
 }
