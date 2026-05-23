@@ -49,10 +49,10 @@ func main() {
 	}
 	defer func() {
 		if err = logger.Sync(); err != nil {
-			logger.Errorf(err, "failed to sync logger: %v", err)
+			logger.Errorf("failed to sync logger: %v", err)
 		}
 		if err = closeLogger(); err != nil {
-			logger.Fatalf(err, "failed to close log file: %v", err)
+			logger.Fatalf("failed to close log file: %v", err)
 		}
 	}()
 
@@ -62,8 +62,8 @@ func main() {
 	conn, err := CreatePool(ctx, cfg.Storage)
 	if err != nil {
 		logger.Fatalf(
+			"can't connect db: %v",
 			err,
-			"can't connect db",
 		)
 	}
 	jsonCodec := jsoncodec.NewJSONCodec(cfg.Tools.JSON)
@@ -89,19 +89,27 @@ func main() {
 	AuthHandler := handler.NewAuth(serviceAuth, logger, jsonCodec, cfg.Storage.QueryTimeout, m)
 	MetricsHandler := handler.NewMetrics(m, reg)
 
-	router := chi.NewRouter()
-	router.Use(api_middleware.Stopwatch(logger))
-	router.Use(prometheus_metrics.Middlware(m, logger))
+	serviceRouter := chi.NewRouter()
+	serviceRouter.Use(api_middleware.Stopwatch(logger))
+	serviceRouter.Use(prometheus_metrics.Middleware(m, logger))
 
-	router.Route("/api", func(r chi.Router) {
+	techRouter := chi.NewRouter()
+
+	serviceRouter.Route("/api", func(r chi.Router) {
 		MainHandler.RegisterRoutes(r)
 		AuthHandler.RegisterRoutes(r)
+	})
+	techRouter.Route("/", func(r chi.Router) {
 		MetricsHandler.RegisterRoutes(r)
 	})
 
-	server := http.Server{
-		Addr:    fmt.Sprintf(":%v", cfg.Port),
-		Handler: router,
+	serviceServer := http.Server{
+		Addr:    fmt.Sprintf(":%v", cfg.ServicePort),
+		Handler: serviceRouter,
+	}
+	techServer := http.Server{
+		Addr:    fmt.Sprintf(":%v", cfg.TechPort),
+		Handler: techRouter,
 	}
 
 	wg := sync.WaitGroup{}
@@ -121,10 +129,16 @@ func main() {
 		) //TODO добавить в конфиг
 		defer shutdownCancel()
 
-		if shutdownErr := server.Shutdown(shutDownCtx); err != nil {
+		if shutdownErr := serviceServer.Shutdown(shutDownCtx); shutdownErr != nil {
 			logger.Errorf(
+				"failed to shutdown service server gracefully: %v",
 				shutdownErr,
-				"failed to shutdown server gracefully",
+			)
+		}
+		if shutdownErr := techServer.Shutdown(shutDownCtx); shutdownErr != nil {
+			logger.Errorf(
+				"failed to shutdown technical server gracefully: %v",
+				shutdownErr,
 			)
 		}
 	}()
@@ -132,11 +146,28 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Infof("Start HTTP-server")
-		if listenErr := server.ListenAndServe(); err != nil && !errors.Is(listenErr, http.ErrServerClosed) {
-			logger.Fatalf(listenErr, "http server failed")
+		logger.Infof("Start service HTTP-server")
+		if listenErr := serviceServer.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			logger.Errorf(
+				"service http server failed: %v",
+				listenErr,
+			)
 		} else {
-			logger.Infof("Stop HTTP-server")
+			logger.Infof("Stop service HTTP-server")
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		logger.Infof("Start technical HTTP-server")
+		if listenErr := techServer.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			logger.Errorf(
+				"technical http server failed: %v",
+				listenErr,
+			)
+		} else {
+			logger.Infof("Stop technical HTTP-server")
 		}
 	}()
 

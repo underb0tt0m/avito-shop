@@ -75,9 +75,9 @@ func (s auth) Auth(ctx context.Context, data dto.AuthRequest) (dto.AuthResponse,
 		[]byte(data.Password),
 	); err != nil {
 		s.Logger.Warnf(
-			domain.ErrUnauthorized,
-			"wrong password: %v",
+			"wrong password: %v, error: %v",
 			hashedUser.Name,
+			domain.ErrUnauthorized,
 		)
 
 		return dto.AuthResponse{}, domain.ErrUnauthorized

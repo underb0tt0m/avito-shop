@@ -14,9 +14,9 @@ import (
 type Logger interface {
 	Debugf(msg string, v ...any)
 	Infof(msg string, v ...any)
-	Warnf(err error, msg string, v ...any)
-	Errorf(err error, msg string, v ...any)
-	Fatalf(err error, msg string, v ...any)
+	Warnf(msg string, v ...any)
+	Errorf(msg string, v ...any)
+	Fatalf(msg string, v ...any)
 	Sync() error
 }
 
@@ -47,27 +47,24 @@ func (l loggerZap) Infof(msg string, v ...any) {
 	l.Logger.Info(fmtMsg)
 }
 
-func (l loggerZap) Warnf(err error, msg string, v ...any) {
+func (l loggerZap) Warnf(msg string, v ...any) {
 	fmtMsg := fmt.Sprintf(msg, v...)
 	l.Logger.Warn(
 		fmtMsg,
-		zap.Error(err),
 	)
 }
 
-func (l loggerZap) Errorf(err error, msg string, v ...any) {
+func (l loggerZap) Errorf(msg string, v ...any) {
 	fmtMsg := fmt.Sprintf(msg, v...)
 	l.Logger.Error(
 		fmtMsg,
-		zap.Error(err),
 	)
 }
 
-func (l loggerZap) Fatalf(err error, msg string, v ...any) {
+func (l loggerZap) Fatalf(msg string, v ...any) {
 	fmtMsg := fmt.Sprintf(msg, v...)
 	l.Logger.Fatal(
 		fmtMsg,
-		zap.Error(err),
 	)
 }
 
@@ -135,11 +132,11 @@ func (LoggerNoop) Debugf(_ string, _ ...any) {}
 
 func (LoggerNoop) Infof(_ string, _ ...any) {}
 
-func (LoggerNoop) Warnf(_ error, _ string, _ ...any) {}
+func (LoggerNoop) Warnf(_ string, _ ...any) {}
 
-func (LoggerNoop) Errorf(_ error, _ string, _ ...any) {}
+func (LoggerNoop) Errorf(_ string, _ ...any) {}
 
-func (LoggerNoop) Fatalf(_ error, _ string, _ ...any) {}
+func (LoggerNoop) Fatalf(_ string, _ ...any) {}
 
 func (LoggerNoop) Sync() error {
 	return nil

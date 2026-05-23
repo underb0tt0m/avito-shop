@@ -1,3 +1,7 @@
 .env
 logs/
 diff.txt
+mocks/
+*_test.go
+coverage.html
+coverage.out

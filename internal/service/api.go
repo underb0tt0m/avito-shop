@@ -35,14 +35,14 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.Logger.Errorf(
+				"user is missing from the database: %v",
 				err,
-				"user is missing from the database",
 			)
 			return nil, domain.ErrNotFound
 		}
 		s.Logger.Errorf(
+			"failed to get user info from mainRoutRepository: %v",
 			err,
-			"failed to get user info from mainRoutRepository",
 		)
 		return nil, err
 	}
@@ -122,8 +122,8 @@ func (s api) GetUserInfo(ctx context.Context, username string) (*dto.InfoRespons
 func (s api) SendCoins(ctx context.Context, fromUser string, toUser dto.SendCoinRequest) error {
 	if toUser.Amount <= 0 {
 		s.Logger.Warnf(
+			"attempt to send unnatural amount of coins: %v",
 			domain.ErrBadRequest,
-			"attempt to send unnatural amount of coins",
 		)
 		return domain.ErrBadRequest
 	}

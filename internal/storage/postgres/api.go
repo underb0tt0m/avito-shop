@@ -41,8 +41,8 @@ WHERE a.name=$1
 	rows, err := s.Conn.Query(ctx, userInfoStmt, username)
 	if err != nil {
 		s.Logger.Errorf(
+			"failed to query user inventory: %v",
 			err,
-			"failed to query user inventory",
 		)
 		return 0, nil, nil, err
 	}
@@ -61,9 +61,8 @@ WHERE a.name=$1
 			&quantity,
 		); err != nil {
 			s.Logger.Errorf(
-
+				"failed to scan user inventory row: %v",
 				err,
-				"failed to scan user inventory row",
 			)
 			return 0, nil, nil, err
 		}
@@ -103,8 +102,8 @@ WHERE b.name=$1 OR c.name=$1
 
 	if err != nil {
 		s.Logger.Errorf(
+			"failed to query user transactions: %v",
 			err,
-			"failed to query user transactions",
 		)
 		return 0, nil, nil, err
 	}
@@ -116,8 +115,8 @@ WHERE b.name=$1 OR c.name=$1
 			&amount,
 		); err != nil {
 			s.Logger.Errorf(
+				"failed to scan user transaction row: %v",
 				err,
-				"failed to scan user transaction row",
 			)
 			return 0, nil, nil, err
 		}
@@ -159,8 +158,8 @@ WHERE u1.name = $2 AND u2.name = $3;
 	tx, err := s.Conn.Begin(ctx)
 	if err != nil {
 		s.Logger.Errorf(
+			"failed to begin transaction: %v",
 			err,
-			"failed to begin transaction",
 		)
 		return err
 	}
@@ -170,7 +169,10 @@ WHERE u1.name = $2 AND u2.name = $3;
 				!errors.Is(err, context.Canceled) &&
 				!errors.Is(err, context.DeadlineExceeded) &&
 				!strings.Contains(err.Error(), "conn closed") {
-				s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+				s.Logger.Errorf(
+					"failed to rollback transaction: %v",
+					err,
+				)
 			}
 		}
 	}()
@@ -185,23 +187,23 @@ WHERE u1.name = $2 AND u2.name = $3;
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 			if pgErr.Code == "23514" {
 				s.Logger.Warnf(
+					"attempt to transfer money with insufficient balance: %v",
 					err,
-					"attempt to transfer money with insufficient balance",
 				)
 				return domain.ErrInsufficientFunds
 			}
 		}
 		s.Logger.Errorf(
+			"failed to update sender balance: %v",
 			err,
-			"failed to update sender balance",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if cmd1.RowsAffected() == 0 {
 		s.Logger.Errorf(
+			"sender not found: %v",
 			domain.ErrNotFound,
-			"sender not found",
 		)
 		return domain.ErrNotFound // хотя такого быть не должно из логики работы приложения
 	}
@@ -214,16 +216,16 @@ WHERE u1.name = $2 AND u2.name = $3;
 	)
 	if err != nil {
 		s.Logger.Errorf(
+			"failed to update recipient balance: %v",
 			err,
-			"failed to update recipient balance",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if cmd2.RowsAffected() == 0 {
 		s.Logger.Errorf(
+			"recipient not found: %v",
 			domain.ErrNotFound,
-			"recipient not found",
 		)
 		return domain.ErrNotFound
 	}
@@ -237,16 +239,16 @@ WHERE u1.name = $2 AND u2.name = $3;
 	)
 	if err != nil {
 		s.Logger.Errorf(
+			"failed to insert transaction: %v",
 			err,
-			"failed to insert transaction",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if err = tx.Commit(ctx); err != nil {
 		s.Logger.Errorf(
+			"failed to commit transaction: %v",
 			err,
-			"failed to commit transaction",
 		)
 		return err
 	}
@@ -258,8 +260,8 @@ func (s storageAPI) BuyItem(ctx context.Context, itemID int, user string) error 
 	tx, err := s.Conn.Begin(ctx)
 	if err != nil {
 		s.Logger.Errorf(
+			"failed to begin transaction: %v",
 			err,
-			"failed to begin transaction",
 		)
 		return err
 	}
@@ -269,7 +271,10 @@ func (s storageAPI) BuyItem(ctx context.Context, itemID int, user string) error 
 				!errors.Is(err, context.Canceled) &&
 				!errors.Is(err, context.DeadlineExceeded) &&
 				!strings.Contains(err.Error(), "conn closed") {
-				s.Logger.Errorf(err, "failed to rollback transaction: %v", err)
+				s.Logger.Errorf(
+					"failed to rollback transaction: %v",
+					err,
+				)
 			}
 		}
 	}()
@@ -299,14 +304,14 @@ SET quantity = user_inventories.quantity + 1;
 	).Scan(&itemPrice); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.Logger.Warnf(
+				"attempt to buy nonexistent item: %v",
 				err,
-				"attempt to buy nonexistent item",
 			)
 			return domain.ErrNotFound
 		}
 		s.Logger.Errorf(
+			"failed to get item cost: %v",
 			err,
-			"failed to get item cost",
 		)
 		return domain.ErrInternalServerError
 	}
@@ -321,8 +326,8 @@ SET quantity = user_inventories.quantity + 1;
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 			if pgErr.Code == "23514" {
 				s.Logger.Warnf(
+					"attempt to transfer money with insufficient balance: %v",
 					err,
-					"attempt to transfer money with insufficient balance",
 				)
 				return domain.ErrInsufficientFunds
 			}
@@ -330,30 +335,30 @@ SET quantity = user_inventories.quantity + 1;
 
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.Logger.Warnf(
+				"user doesn't exist: %v",
 				err,
-				"user doesn't exist",
 			)
 			return domain.ErrNotFound
 		}
 		s.Logger.Errorf(
+			"failed to update user balance: %v",
 			err,
-			"failed to update user balance",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if _, err = tx.Exec(ctx, insertStmt, userID, itemID); err != nil {
 		s.Logger.Errorf(
+			"failed to insert row in user_inventories: %v",
 			err,
-			"failed to insert row in user_inventories",
 		)
 		return domain.ErrInternalServerError
 	}
 
 	if err = tx.Commit(ctx); err != nil {
 		s.Logger.Errorf(
+			"failed to commit transaction: %v",
 			err,
-			"failed to commit transaction",
 		)
 		return domain.ErrInternalServerError
 	}

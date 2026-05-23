@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"avito-shop/cmd/handler/http_error"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/jwtmanager"
 	"avito-shop/internal/logging"
@@ -37,28 +38,28 @@ func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker, m *prometheus
 			token := r.Header.Get("Authorization")
 			if token == "" {
 				logger.Warnf(
+					"user unauthorized: %v",
 					domain.ErrUnauthorized,
-					"user unauthorized",
 				)
-				domain.WriteError(w, domain.ErrUnauthorized, logger, m)
-				m.AuthAttempts.WithLabelValues(prometheus_metrics.StatusAuthFailed).Inc()
+				http_error.Write(w, domain.ErrUnauthorized, logger, m)
+				m.AuthAttempts.WithLabelValues("app:8080", prometheus_metrics.StatusAuthFailed).Inc()
 				return
 			}
 			token, ok := strings.CutPrefix(token, tokenMaker.GetPrefix())
 			if !ok {
 				logger.Warnf(
+					"Token without prefix: %v",
 					domain.ErrInvalidToken,
-					"Token without prefix",
 				)
-				domain.WriteError(w, domain.ErrInvalidToken, logger, m)
-				m.AuthAttempts.WithLabelValues(prometheus_metrics.StatusAuthFailed).Inc()
+				http_error.Write(w, domain.ErrInvalidToken, logger, m)
+				m.AuthAttempts.WithLabelValues("app:8080", prometheus_metrics.StatusAuthFailed).Inc()
 				return
 			}
 			token = strings.TrimSpace(token)
 			jsonBytes, err := tokenMaker.ParseUserTokenRaw(token)
 			if err != nil {
-				domain.WriteError(w, err, logger, m)
-				m.AuthAttempts.WithLabelValues(prometheus_metrics.StatusAuthFailed).Inc()
+				http_error.Write(w, err, logger, m)
+				m.AuthAttempts.WithLabelValues("app:8080", prometheus_metrics.StatusAuthFailed).Inc()
 				return
 			}
 			var claims domain.DefaultUser
@@ -67,26 +68,26 @@ func Auth(logger logging.Logger, tokenMaker jwtmanager.TokenMaker, m *prometheus
 				&claims,
 			); err != nil {
 				logger.Errorf(
+					"failed to unmarshal token: %v",
 					err,
-					"failed to unmarshal token",
 				)
-				domain.WriteError(w, domain.ErrBadRequest, logger, m)
-				m.AuthAttempts.WithLabelValues(prometheus_metrics.StatusAuthFailed).Inc()
+				http_error.Write(w, domain.ErrBadRequest, logger, m)
+				m.AuthAttempts.WithLabelValues("app:8080", prometheus_metrics.StatusAuthFailed).Inc()
 				return
 			}
 
 			if claims.ExpiresAt.Unix() < time.Now().Unix() {
 				logger.Warnf(
+					"token is expired: %v",
 					domain.ErrTokenExpired,
-					"token is expired",
 				)
-				domain.WriteError(w, domain.ErrTokenExpired, logger, m)
-				m.AuthAttempts.WithLabelValues(prometheus_metrics.StatusAuthFailed).Inc()
+				http_error.Write(w, domain.ErrTokenExpired, logger, m)
+				m.AuthAttempts.WithLabelValues("app:8080", prometheus_metrics.StatusAuthFailed).Inc()
 				return
 			}
 
 			ctx := context.WithValue(r.Context(), domain.UserContextKey, claims)
-			m.AuthAttempts.WithLabelValues(prometheus_metrics.StatusAuthSuccess).Inc()
+			m.AuthAttempts.WithLabelValues("app:8080", prometheus_metrics.StatusAuthSuccess).Inc()
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

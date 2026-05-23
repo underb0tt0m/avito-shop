@@ -1,7 +1,6 @@
 package prometheus_metrics
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,7 +24,7 @@ func (w *ResponseWriter) Write(data []byte) (int, error) {
 	return w.ResponseWriter.Write(data)
 }
 
-func Middlware(m *Metrics, logger logging.Logger) func(handler http.Handler) http.Handler {
+func Middleware(m *Metrics, logger logging.Logger) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rWriter := &ResponseWriter{
@@ -38,7 +37,6 @@ func Middlware(m *Metrics, logger logging.Logger) func(handler http.Handler) htt
 			startTime, ok := startRaw.(time.Time)
 			if !ok {
 				logger.Errorf(
-					errors.New("failed to get request start time from context"),
 					"failed to get request start time from context",
 				)
 				return

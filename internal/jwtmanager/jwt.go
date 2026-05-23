@@ -47,8 +47,8 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	jsonBytes, err := t.jsonCodec.Marshal(data)
 	if err != nil {
 		t.logger.Errorf(
+			"failed to marshal token data: %v",
 			err,
-			"failed to marshal token data",
 		)
 		return "", err
 	}
@@ -59,8 +59,8 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 		&mapClaims,
 	); err != nil {
 		t.logger.Errorf(
+			"failed to unmarshal token data: %v",
 			err,
-			"failed to unmarshal token data",
 		)
 		return "", err
 	}
@@ -73,8 +73,8 @@ func (t jwtTokenMaker) CreateToken(data any) (string, error) {
 	tokenString, err := token.SignedString(t.secret)
 	if err != nil {
 		t.logger.Errorf(
+			"failed to sign token: %v",
 			err,
-			"failed to sign token",
 		)
 		return "", err
 	}
@@ -85,8 +85,8 @@ func (t jwtTokenMaker) ValidateUserToken(tokenString string) error {
 	_, err := jwt.Parse(tokenString, createKeyFunc(t.logger, t.secret))
 	if err != nil {
 		t.logger.Errorf(
+			"invalid token: %v",
 			domain.ErrInvalidToken,
-			"invalid token",
 		)
 		return domain.ErrInvalidToken
 	}
@@ -97,15 +97,15 @@ func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string) ([]byte, error) {
 	token, err := jwt.Parse(tokenString, createKeyFunc(t.logger, t.secret))
 	if err != nil {
 		t.logger.Warnf(
+			"invalid token: %v",
 			domain.ErrInvalidToken,
-			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
 	if !token.Valid {
 		t.logger.Warnf(
+			"invalid token: %v",
 			domain.ErrInvalidToken,
-			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
@@ -113,8 +113,8 @@ func (t jwtTokenMaker) ParseUserTokenRaw(tokenString string) ([]byte, error) {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		t.logger.Warnf(
+			"invalid token: %v",
 			domain.ErrInvalidToken,
-			"invalid token",
 		)
 		return nil, domain.ErrInvalidToken
 	}
@@ -129,9 +129,9 @@ func createKeyFunc(logger logging.Logger, secret []byte) jwt.Keyfunc {
 	return func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			logger.Errorf(
-				domain.ErrWrongSigningMethod,
-				"unexpected signing method: %v",
+				"unexpected signing method: %v, error: %v",
 				token.Header["alg"],
+				domain.ErrWrongSigningMethod,
 			)
 			return nil, domain.ErrWrongSigningMethod
 		}

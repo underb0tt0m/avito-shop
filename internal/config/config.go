@@ -10,12 +10,13 @@ import (
 
 // Config представляет основную структуру конфигурации приложения.
 type Config struct {
-	ServerType string   `yaml:"server_type"`
-	Port       string   `yaml:"port"`
-	Storage    Storage  `yaml:"storage"`
-	Logger     Logger   `yaml:"logger"`
-	Tools      Tools    `yaml:"tools"`
-	Security   Security `yaml:"security"`
+	ServerType  string   `yaml:"server_type"`
+	ServicePort string   `yaml:"service_port"`
+	TechPort    string   `yaml:"technical_port"`
+	Storage     Storage  `yaml:"storage"`
+	Logger      Logger   `yaml:"logger"`
+	Tools       Tools    `yaml:"tools"`
+	Security    Security `yaml:"security"`
 }
 
 // Storage представляет конфигурацию хранилища данных.

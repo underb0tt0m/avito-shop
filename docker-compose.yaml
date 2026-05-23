@@ -2,14 +2,14 @@ services:
   app:
     container_name: app
     build:
-      context: ..
-      dockerfile: cmd/Dockerfile
+      dockerfile: ./cmd/Dockerfile
     ports:
       - "8080:8080"
+      - "9200:9200"
     volumes:
-      - ../logs:/root/logs
-      - ../.env:/root/.env
-      - ./config.yaml:/root/config.yaml
+      - ./logs:/root/logs
+      - ./.env:/root/.env
+      - ./cmd/config.yaml:/root/config.yaml
     depends_on:
       db:
         condition: service_healthy
@@ -44,7 +44,7 @@ services:
       - "postgresql://postgres:postgres@db:5432/avito_shop?sslmode=disable"
       - "up"
     volumes:
-      - ../internal/storage/postgres/migrations:/migrations
+      - ./internal/storage/postgres/migrations:/migrations
     depends_on:
       db:
         condition: service_healthy

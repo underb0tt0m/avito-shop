@@ -25,8 +25,8 @@ func (h bcryptHasher) Hash(data string, logger logging.Logger) ([]byte, error) {
 	hashedData, err := bcrypt.GenerateFromPassword([]byte(data), h.hashCost)
 	if err != nil {
 		logger.Errorf(
+			"failed to hash data: %v",
 			err,
-			"failed to hash data",
 		)
 		return []byte{}, domain.ErrInternalServerError
 	}
