@@ -1,5 +1,6 @@
 server_type: "development"           # TODO
-port: "8080"
+service_port: "8080"
+technical_port: "9200"
 
 storage:
   type: "postgres"                 # TODO

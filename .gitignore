@@ -4,4 +4,7 @@
 logs/
 
 diff.txt
+final.md
 /bin/
+coverage.html
+coverage.out

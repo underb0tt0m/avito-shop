@@ -4,10 +4,10 @@ BINARY_NAME=avito-shop
 BINARY_PATH=bin/$(BINARY_NAME)
 
 docker-compose-build-up:
-	docker compose -f ./cmd/docker-compose.yaml -p avito-shop up --build -d
+	docker compose -f ./docker-compose.yaml -p avito-shop up --build -d
 
 docker-compose-up:
-	docker compose -f ./cmd/docker-compose.yaml -p avito-shop up -d
+	docker compose -f ./docker-compose.yaml -p avito-shop up -d
 
 build:
 	go build -v -o $(BINARY_PATH) ./cmd/

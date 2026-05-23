@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"avito-shop/cmd/dto"
+	"avito-shop/cmd/handler/http_error"
 	"avito-shop/internal/domain"
 	"avito-shop/internal/jsoncodec"
 	"avito-shop/internal/logging"
@@ -54,17 +55,17 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err = r.Body.Close(); err != nil {
 			h.logger.Errorf(
+				"failed to close auth request body: %v",
 				err,
-				"failed to close auth request body",
 			)
 		}
 	}()
 	if err != nil {
 		h.logger.Errorf(
+			"failed to read auth request body: %v",
 			err,
-			"failed to read auth request body",
 		)
-		domain.WriteError(w, err, h.logger, h.metrics)
+		http_error.Write(w, err, h.logger, h.metrics)
 		return
 	}
 
@@ -74,10 +75,10 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 		&user,
 	); err != nil {
 		h.logger.Errorf(
+			"failed to unmarshal auth request body: %v",
 			err,
-			"failed to unmarshal auth request body",
 		)
-		domain.WriteError(w, domain.ErrUnprocessableEntity, h.logger, h.metrics)
+		http_error.Write(w, domain.ErrUnprocessableEntity, h.logger, h.metrics)
 		return
 	}
 
@@ -90,30 +91,30 @@ func (h Auth) handleAuth(w http.ResponseWriter, r *http.Request) {
 	token, err := h.service.Auth(ctx, user)
 	if err != nil {
 		h.logger.Warnf(
-			err,
-			"authentication denied, username: %v",
+			"authentication denied, username: %v, error: %v",
 			user.Name,
+			err,
 		)
-		domain.WriteError(w, err, h.logger, h.metrics)
+		http_error.Write(w, err, h.logger, h.metrics)
 		return
 	}
 
 	responseBody, err := h.jsonCodec.Marshal(token)
 	if err != nil {
 		h.logger.Errorf(
+			"failed to marshal auth response body: %v",
 			err,
-			"failed to marshal auth response body",
 		)
-		domain.WriteError(w, err, h.logger, h.metrics)
+		http_error.Write(w, err, h.logger, h.metrics)
 		return
 	}
 
 	if _, err = w.Write(responseBody); err != nil {
 		h.logger.Errorf(
+			"failed to write auth response: %v",
 			err,
-			"failed to write auth response",
 		)
-		domain.WriteError(w, err, h.logger, h.metrics)
+		http_error.Write(w, err, h.logger, h.metrics)
 		return
 	}
 }

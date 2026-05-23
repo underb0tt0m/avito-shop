@@ -36,7 +36,7 @@ func New(reg prometheus.Registerer) *Metrics {
 		AuthAttempts: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "auth_attempts_total",
 		},
-			[]string{"code"},
+			[]string{"instance", "code"},
 		),
 		RegisteredUsers: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "users_registered_total",
@@ -44,18 +44,18 @@ func New(reg prometheus.Registerer) *Metrics {
 		Transactions: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "transactions_total",
 		},
-			[]string{"code"},
+			[]string{"instance", "code"},
 		),
 		Purchases: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "purchases_total",
 		},
-			[]string{"ID"},
+			[]string{"instance"},
 		),
 		Errors: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "errors_user_total",
-			Help: "Уrrors caused by the client",
+			Help: "Errors caused by the client",
 		},
-			[]string{"code"},
+			[]string{"instance", "code"},
 		),
 		RequestSize: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "echo_request_size_bytes_sum",
