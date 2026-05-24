@@ -18,7 +18,7 @@ logger:                              # TODO
   level: "info"
 
 tools:
-  json: "sonic"
+  jsoncodec: "sonic"
 
 security:
   hash:
